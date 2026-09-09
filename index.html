@@ -27,27 +27,27 @@
   <section class="layout">
 
     <div class="panel">
+      <div class="hud" id="hud">
+        <label class="hud-f"><span>從哪頭開進來</span><select id="approach">
+          <option value="left">巷子左邊</option>
+          <option value="right">巷子右邊</option>
+        </select></label>
+        <div class="hud-f"><span>停妥車頭朝</span><b class="hud-derived" id="parkDirOut">右</b></div>
+        <label class="hud-f"><span>入庫方式</span><select id="entry">
+          <option value="any">自動</option>
+          <option value="reverse">倒車入庫</option>
+          <option value="forward">前進入庫</option>
+        </select></label>
+        <div class="hud-sep"></div>
+        <div class="hud-n"><b id="hSlot">—</b><span>可用車位</span></div>
+        <div class="hud-n"><b id="hIdeal">—</b><span>單次進入需求</span></div>
+        <div class="hud-n"><b id="hNarrow">—</b><span>巷道最窄</span></div>
+        <div class="hud-n"><b id="hGate">—</b><span>大門可通行</span></div>
+        <div class="hud-n"><b id="hFarGate">—</b><span>對面大門可通行</span></div>
+        <div class="hud-n"><b id="hCharge">—</b><span>充電線長度</span></div>
+      </div>
       <div class="canvas-wrap">
         <canvas id="scene" aria-label="俯視窄巷平行停車場景"></canvas>
-        <div class="hud" id="hud">
-          <label class="hud-f"><span>從哪頭開進來</span><select id="approach">
-            <option value="left">巷子左邊</option>
-            <option value="right">巷子右邊</option>
-          </select></label>
-          <div class="hud-f"><span>停妥車頭朝</span><b class="hud-derived" id="parkDirOut">右</b></div>
-          <label class="hud-f"><span>入庫方式</span><select id="entry">
-            <option value="any">自動</option>
-            <option value="reverse">倒車入庫</option>
-            <option value="forward">前進入庫</option>
-          </select></label>
-          <div class="hud-sep"></div>
-          <div class="hud-n"><b id="hSlot">—</b><span>可用車位</span></div>
-          <div class="hud-n"><b id="hIdeal">—</b><span>單次進入需求</span></div>
-          <div class="hud-n"><b id="hNarrow">—</b><span>巷道最窄</span></div>
-          <div class="hud-n"><b id="hGate">—</b><span>大門可通行</span></div>
-          <div class="hud-n"><b id="hFarGate">—</b><span>對面大門可通行</span></div>
-          <div class="hud-n"><b id="hCharge">—</b><span>充電線長度</span></div>
-        </div>
         <div class="tip" id="tip">直接在圖上<b>拖曳</b>障礙物就能調位置：拖中間搬動、拖左右端改長度、拖面向巷道那一邊改突出深度。牆上的<b>大門</b>與<b>充電器</b>也能拖（拖大門兩端可改寬度）。</div>
       </div>
       <div class="legend">

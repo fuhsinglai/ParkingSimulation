@@ -128,26 +128,20 @@ function resize() {
 }
 
 /**
- * 參數列與提示條浮在畫布上，場景要讓出它們的高度，路面才不會被蓋住。
+ * 提示條浮在畫布底部，場景要讓出它蓋住的那一段，路面才不會被壓在下面。
  *
- * 高度用量的而不是寫死的：視窗一窄，那兩塊就會換行變高。11px 是 CSS 裡浮層
- * 距離畫布邊緣的距離，上下各留一份當間距。
+ * 量的是「實際蓋住畫布多少」，不是元素自己多高：窄螢幕時它會排到畫布外面變成
+ * 普通元素，那時候一格都不必讓 —— 拿高度硬減會把場景壓成一條線。
  */
 function remakeView() {
   if (!canvas.width) return;
   const box = canvas.getBoundingClientRect();
   if (!box.height) return;
-  const dpr = canvas.height / box.height;
-  const gap = 11;
-  // 量的是「實際蓋住畫布多少」，不是元素自己多高。窄螢幕時參數列會排到畫布外面
-  // 變成普通元素，那時候一格都不必讓 —— 拿高度硬減會把場景壓成一條線。
-  const over = (sel, edge) => {
-    const b = $(sel).getBoundingClientRect();
-    if (!b.height || b.top >= box.bottom || b.bottom <= box.top) return 0;
-    const d = edge === 'top' ? b.bottom - box.top : box.bottom - b.top;
-    return Math.max(0, d + gap) * dpr;
-  };
-  view = makeView(canvas, scene, 0.4, over('#hud', 'top'), over('#tip', 'bottom'));
+  const gap = 11;   // 與 CSS 裡浮層距離畫布邊緣的距離一致
+  const tip = $('#tip').getBoundingClientRect();
+  const covers = tip.height && tip.top < box.bottom && tip.bottom > box.top;
+  const bottom = covers ? Math.max(0, box.bottom - tip.top + gap) * (canvas.height / box.height) : 0;
+  view = makeView(canvas, scene, 0.4, 0, bottom);
 }
 new ResizeObserver(resize).observe(canvas);
 

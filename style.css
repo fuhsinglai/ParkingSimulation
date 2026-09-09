@@ -70,7 +70,7 @@ body[data-tab="setup"] [data-only="sim"] { display: none !important; }
 .panel h2 { font-size: 1.02rem; margin: 0 0 11px; }
 
 .canvas-wrap { position: relative; background: #cbd1d3; }
-.canvas-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 1000/640; touch-action: none; }
+.canvas-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 1000/560; touch-action: none; }
 
 /* 圖例排在畫布下面，不浮在上面 —— 八列的直式圖例會蓋掉左半邊的路面。 */
 .legend {
@@ -197,13 +197,11 @@ summary { cursor: pointer; font-weight: 750; margin: -2px 0 8px; }
 .fixes li { margin-bottom: 3px; }
 .fix-d { color: #9a7a3e; margin-left: 6px; font-variant-numeric: tabular-nums; }
 
-/* ---- 圖上參數列 ---- */
+/* ---- 參數列 ---- */
+/* 排在圖的上方，不浮在圖上 —— 浮著就得從畫布挖一塊空間讓它，那塊還不小。 */
 .hud {
-  position: absolute; top: 11px; left: 252px; right: 11px;
   display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap;
-  background: rgba(255, 255, 255, .93); backdrop-filter: blur(8px);
-  border-radius: 12px; padding: 9px 13px;
-  box-shadow: 0 3px 14px rgba(0, 0, 0, .12);
+  padding: 10px 14px; border-bottom: 1px solid var(--line);
 }
 .hud-f { display: grid; gap: 3px; }
 .hud-f span { font-size: .68rem; color: var(--muted); font-weight: 600; }
@@ -218,12 +216,9 @@ summary { cursor: pointer; font-weight: 750; margin: -2px 0 8px; }
 .hud-n.bad b { color: var(--red); }
 
 @media (max-width: 1000px) {
-  /* 窄螢幕放不下浮在圖上的參數列與提示條，改排到圖的下面。
-     留著絕對定位的話，它們會落在畫布外、互相疊在一起。 */
-  .hud { position: static; margin: 0; border-radius: 0; box-shadow: none; background: #fff; border-bottom: 1px solid var(--line); }
+  /* 窄螢幕連提示條都不浮在圖上。留著絕對定位的話它會落在畫布外面疊到別的東西。 */
   .tip { position: static; border-radius: 0; }
-  /* 沒有東西浮在圖上了，畫布就不必為了讓位而留那麼高。 */
-  .canvas-wrap canvas { aspect-ratio: 1.45; }
+  .canvas-wrap canvas { aspect-ratio: 1.25; }
 }
 
 .hud-derived {
