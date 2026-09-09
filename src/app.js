@@ -944,14 +944,14 @@ for (const ev of ['pointerup', 'pointercancel']) {
 
 /**
  * 鍵盤操作：
- *   W/S     前進、倒車
- *   ←/→     往畫面的左／右開
- *   A/D     方向盤打 1/4 個行程（跟按鈕一樣，連按四下到底）
+ *   A、←    往畫面的左邊開
+ *   D、→    往畫面的右邊開
  *   Q       方向盤回正
  *   空白鍵   播放／暫停已規劃的路徑
  *
- * 方向盤微調交給滑鼠滾輪，↑/↓ 就沒有存在的必要了 —— 俯視圖上車只沿巷道左右走，
- * 拿上下鍵當前進倒車反而要在腦中多轉一次。
+ * 全部以「車子在圖上往哪邊走」為準。俯視圖上車只沿巷道左右移動，先把前進倒車
+ * 在腦中換算成左右再按鍵是多餘的一步，所以 W/S 與 ↑/↓ 都收掉了。
+ * 方向盤交給滑鼠滾輪、滑桿與畫面上的按鈕，鍵盤只留回正。
  */
 addEventListener('keydown', (e) => {
   const tag = e.target.tagName;
@@ -959,17 +959,14 @@ addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
 
-  if (k === 'w') { move(1); e.preventDefault(); return; }
-  if (k === 's') { move(-1); e.preventDefault(); return; }
-  if (k === 'a') { nudgeSteer(-1); e.preventDefault(); return; }
-  if (k === 'd') { nudgeSteer(1); e.preventDefault(); return; }
   if (k === 'q') { nudgeSteer(0); e.preventDefault(); return; }
 
-  // ←/→ 是「往畫面的哪一邊開」，不是前進倒車。車頭朝右時按 → 是前進，
-  // 車頭朝左時按 → 就是倒車 —— 按鍵對應的是車子在圖上移動的方向。
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+  // A/← 與 D/→ 是「往畫面的哪一邊開」，不是前進倒車。車頭朝右時按 D 是前進，
+  // 車頭朝左時按 D 就是倒車 —— 按鍵對應的是車子在圖上移動的方向。
+  const toRight = k === 'd' || e.key === 'ArrowRight';
+  if (toRight || k === 'a' || e.key === 'ArrowLeft') {
     const noseRight = Math.cos(pose.theta) >= 0;
-    move((e.key === 'ArrowRight') === noseRight ? 1 : -1);
+    move(toRight === noseRight ? 1 : -1);
     e.preventDefault();
     return;
   }

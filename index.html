@@ -59,16 +59,16 @@
       <div class="drivebar">
         <div class="db-row">
           <div class="db-group">
-            <button class="btn db-s" id="steerWall">◀ 打向牆側<kbd>A</kbd></button>
+            <button class="btn db-s" id="steerWall">◀ 打向牆側</button>
             <button class="btn db-s" id="steerZero">回正<kbd>Q</kbd></button>
-            <button class="btn db-s" id="steerOut2">打向外側 ▶<kbd>D</kbd></button>
+            <button class="btn db-s" id="steerOut2">打向外側 ▶</button>
           </div>
           <input id="steer" type="range" min="-33" max="33" value="0" step="1" aria-label="前輪轉向角度">
           <output id="steerOut" class="db-out">回正</output>
         </div>
         <div class="db-row">
-          <button class="btn reverse db-drive" id="reverse">▼ 倒車 <b id="stepBack">10</b>cm<kbd>S</kbd></button>
-          <button class="btn forward db-drive" id="forward">▲ 前進 <b id="stepFwd">10</b>cm<kbd>W</kbd></button>
+          <button class="btn reverse db-drive" id="reverse">▼ 倒車 <b id="stepBack">10</b>cm</button>
+          <button class="btn forward db-drive" id="forward">▲ 前進 <b id="stepFwd">10</b>cm</button>
           <div class="steps-pick" id="stepPick" role="group" aria-label="每次移動距離">
             <button data-step="0.02">2</button><button data-step="0.05">5</button><button data-step="0.10">10</button><button data-step="0.25">25</button><button data-step="0.50">50</button><span>cm</span>
           </div>
@@ -81,7 +81,7 @@
           <button class="btn db-s" id="toStart">回到起點</button>
           <button class="btn db-s" id="toGoal">放到定位</button>
         </div>
-        <p class="note db-hint" id="hint"><b>W</b>／<b>S</b> 前進倒車，<b>←</b>／<b>→</b> 往畫面左／右開（車頭朝哪邊決定那是前進還是倒車），<b>A</b>／<b>D</b> 方向盤打 1/4 個行程，<b>Q</b> 回正，<b>空白鍵</b> 播放／暫停。<br><b>滑鼠滾輪</b>在圖上或這一列也能轉方向盤：往上打向外側，一格 2 度。</p>
+        <p class="note db-hint" id="hint"><b>A</b>／<b>←</b> 往畫面左開，<b>D</b>／<b>→</b> 往畫面右開（車頭朝哪邊決定那是前進還是倒車），<b>Q</b> 方向盤回正，<b>空白鍵</b> 播放／暫停。<br><b>滑鼠滾輪</b>在圖上或這一列也能轉方向盤：往上打向外側，一格 2 度。</p>
       </div>
 
       <div class="timeline" id="timeline" hidden>
