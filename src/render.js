@@ -101,8 +101,16 @@ export function drawScene(ctx, scene, view, opts = {}) {
   ctx.fillStyle = 'rgba(255,255,255,.6)';
   ctx.font = '0.26px system-ui, sans-serif';
   ctx.textAlign = 'center';
-  // 標在車位裡面而不是牆上那條帶子 —— 帶子上還有充電器與大門，擠在一起會互相蓋掉。
-  ctx.fillText(`可用車位 ${slot.length.toFixed(2)}m`, slot.start + slot.length / 2, 0.36);
+  // 標在牆上那條帶子、靠車位起點那一端。置中會壓到充電器 —— 它也在帶子上，
+  // 而且最後才畫，會蓋在字上面。充電器剛好就在那一端時，改靠另一端。
+  const slotTxt = `可用車位 ${slot.length.toFixed(2)}m`;
+  const stw = ctx.measureText(slotTxt).width;
+  const chx = scene.charger ? scene.charger.x : null;
+  // 充電器剛好也在那一端時就往下挪一格，掉進車位裡。不換到另一端 ——
+  // 那一端是大門標註的位置，換過去只是把碰撞搬個家。
+  const leftBusy = chx !== null && chx > slot.start - 0.4 && chx < slot.start + stw + 0.6;
+  ctx.textAlign = 'start';
+  ctx.fillText(slotTxt, slot.start + 0.15, leftBusy ? 0.36 : -0.34);
   ctx.textAlign = 'end';
   ctx.fillText(`巷寬 ${W.toFixed(2)}m`, xMax - 0.25, W / 2 - 0.16);
   ctx.textAlign = 'start';
