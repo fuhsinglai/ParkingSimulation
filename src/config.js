@@ -142,5 +142,42 @@ export const DEFAULT_OBSTACLES = [
   { id: 'oppScooters2', label: '對面機車群（右）', side: 'far', kind: 'scooter', x: 11.95, length: 1.10, depth: 1.70, on: true },
 ];
 
+/**
+ * 挑戰關卡：同一條巷子的幾種現場狀況，由鬆到緊。
+ *
+ * 只描述與預設場景的差異，其餘一律沿用 DEFAULT_SCENE 與 DEFAULT_OBSTACLES ——
+ * 關卡因此不會隨使用者調過的設定漂移，每次開始都是同一道題。
+ *   patch   覆蓋場景欄位
+ *   without 移走這些障礙物
+ *   nudge   把某個障礙物沿巷道挪動（公尺，正值往右）
+ */
+export const CHALLENGES = [
+  {
+    id: 'wide', name: '巷子寬一點',
+    hint: '巷道拉到 6.6m。轉得開，先熟悉操作。',
+    patch: { alleyWidth: 6.6 },
+  },
+  {
+    id: 'clear', name: '對面清空',
+    hint: '對面的機車與電箱都不在，車頭甩得出去。',
+    without: ['oppScooters', 'oppScooters2', 'oppBox'],
+  },
+  {
+    id: 'gap', name: '後車讓一公尺',
+    hint: '後面那台往左挪了 1m，車位變成 7.1m。',
+    nudge: { rearCar: -1 },
+  },
+  {
+    id: 'site', name: '現場原況',
+    hint: '照現場量到的配置。車位比單次進入所需短 17cm，非折車不可。',
+  },
+  {
+    id: 'hug', name: '貼牆 8cm',
+    hint: '靠牆只留 8cm。車尾內角隨時會刮到牆。',
+    patch: { wallGap: 0.08 },
+  },
+];
+
+
 /** 安全裕度：規劃器要求車體與障礙至少留這麼多（公尺）。 */
 export const SAFETY_MARGIN = 0.06;

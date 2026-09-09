@@ -4,7 +4,7 @@
  * 只有一個 requestAnimationFrame 迴圈，而且是「需要時才重畫」——
  * 參考版有兩個永不停止的 rAF 迴圈，分頁在背景時照樣燒 CPU。
  */
-import { VEHICLE, DEFAULT_SCENE, DEFAULT_OBSTACLES, SCOOTER_PITCH, makeVehicle, steerFromTurningRadius } from './config.js';
+import { VEHICLE, DEFAULT_SCENE, DEFAULT_OBSTACLES, SCOOTER_PITCH, CHALLENGES, makeVehicle, steerFromTurningRadius } from './config.js';
 import { buildScene, collide, cornerClearances, clearances, isParked, narrowestPoint, chargeReach, gateBlock, farGateBlock, PASS_WIDTH } from './scene.js';
 import { idealMinSlotLength, expandPoses } from './planner.js';
 import { integrate, describeSteer } from './vehicle.js';
@@ -53,17 +53,21 @@ const cfg = {
   obstacles: (saved?.cfg?.obstacles || DEFAULT_OBSTACLES).map(o => ({ ...o })),
 };
 const opts = {
-  sweep: true, trace: true, clear: true, ghost: true,
+  sweep: true, trace: true, clear: true, ghost: true, compare: true,
   step: 0.10,   // 每按一下前進／倒車走多遠（公尺）
   ...(saved?.opts || {}),
 };
+
+// 挑戰會把場景換成關卡的配置。使用者自己量出來的那一份先收在這裡，
+// 存檔一律存這一份 —— 玩個挑戰就把辛苦量的現場設定洗掉，那太糟了。
+let userCfg = null;
 
 let saveTimer = null;
 function saveNow() {
   clearTimeout(saveTimer);
   saveTimer = null;
   try {
-    localStorage.setItem(STORE_KEY, JSON.stringify({ cfg, opts, at: Date.now() }));
+    localStorage.setItem(STORE_KEY, JSON.stringify({ cfg: userCfg || cfg, opts, at: Date.now() }));
     storeState = '設定已存到這台裝置';
   } catch (err) {
     storeState = '存不進去：' + (err && err.name ? err.name : '未知錯誤');
@@ -89,11 +93,16 @@ let view = null;
 let pose = { ...scene.start };
 let steerDeg = 0;
 let manualPoses = [{ ...pose, dir: 0 }];
+// 每按一下前進／倒車就記一筆指令。manualPoses 是畫出來的軌跡，這個是「怎麼開的」，
+// 回放時餵給 expandPoses 就變成跟規劃結果同形狀的路徑。兩者一起 push、一起 pop。
+let manualSegs = [];
 let history = [];
 let moves = 0;
 
 // 規劃結果狀態
 let plan = null;          // { poses, segments, reversals, cost, tier, ... }
+// 挑戰狀態。宣告在這裡是因為畫面更新會讀它，而那比下面的挑戰區塊更早跑到。
+let challenge = null;     // { def, startPose, par, parState, done }
 let playhead = 0;
 let playing = false;
 let lastFrame = 0;
@@ -145,6 +154,17 @@ function draw() {
 
   const poses = activePoses();
   const upto = plan ? headIndex() + 1 : poses.length;
+
+  // 對照播：規劃器的路徑與車按同樣的「完成比例」跟著跑。兩條路徑長度不一樣，
+  // 用索引對齊會有一邊先跑完；用比例才看得出誰在哪一段多繞了。
+  const par = opts.compare && challenge && challenge.par ? challenge.par : null;
+  if (par && par.poses.length) {
+    const frac = poses.length > 1 ? (upto - 1) / (poses.length - 1) : 0;
+    const j = Math.max(0, Math.min(par.poses.length - 1, Math.round(frac * (par.poses.length - 1))));
+    drawTrace(ctx, par.poses, j + 1, { ghost: true });
+    drawCar(ctx, par.poses[j], scene.v, { ghost: true, steer: par.poses[j].steer || 0 });
+  }
+
   if (opts.sweep && poses.length > 1) drawSweep(ctx, poses, scene.v, upto);
   if (opts.trace && poses.length > 1) drawTrace(ctx, poses, upto);
 
@@ -199,6 +219,7 @@ function updateStatus() {
   $('#mClear').textContent = near ? near.distance.toFixed(2) + 'm' : '—';
   $('#mMoves').textContent = moves;
   $('#mShifts').textContent = plan ? plan.reversals : manualReversals();
+  if (challenge) $('#chNow').textContent = fmtScore(scoreOf());
 }
 
 /**
@@ -452,6 +473,7 @@ function move(dir) {
   history.push({ pose: { ...pose }, moves });
   pose = integrate(pose, dir * opts.step, steerDeg * Math.PI / 180, scene.v.wheelbase);
   manualPoses.push({ ...pose, dir });
+  manualSegs.push({ dist: dir * opts.step, steer: steerDeg * Math.PI / 180 });
   moves++;
 
   const hitObs = collide(scene, pose, 0);
@@ -463,13 +485,20 @@ function move(dir) {
     const c = cornerClearances(scene, pose).sort((a, b) => a.distance - b.distance)[0];
     setTip(`${dir < 0 ? '倒車' : '前進'} ${Math.round(opts.step * 100)}cm：最近的是${c.corner}，離${c.label} ${c.distance.toFixed(2)}m。`);
   }
+  if (challenge && !challenge.done && !hitObs && isParked(scene, pose)) finishChallenge();
   invalidate();
+}
+
+/** 這一趟總共開了多遠。折返次數同分時用它分高下。 */
+function manualCost() {
+  return manualSegs.reduce((sum, s) => sum + Math.abs(s.dist), 0);
 }
 
 function resetTo(target) {
   clearPlan();
   pose = { ...target };
   manualPoses = [{ ...pose, dir: 0 }];
+  manualSegs = [];
   history = [];
   moves = 0;
   steerDeg = 0;
@@ -489,6 +518,7 @@ function rebuild() {
   clearPlan();
   pose = { ...scene.start };
   manualPoses = [{ ...pose, dir: 0 }];
+  manualSegs = [];
   history = [];
   moves = 0;
   $('#planBtn').textContent = '⌕ 規劃停入路徑';
@@ -784,11 +814,222 @@ $('#reverse').onclick = () => move(-1);
 $('#undo').onclick = () => {
   if (plan || !history.length) return;
   const h = history.pop();
-  pose = h.pose; moves = h.moves; manualPoses.pop();
+  pose = h.pose; moves = h.moves; manualPoses.pop(); manualSegs.pop();
   invalidate();
 };
 $('#toStart').onclick = () => resetTo(scene.start);
 $('#toGoal').onclick = () => resetTo(scene.goal);
+
+// ---------------------------------------------------------------- 挑戰
+//
+// 關卡是固定的題目：同一條巷子的幾種現場狀況。開始挑戰時場景鎖住，因為改場景
+// 就是改題目，成績也就沒得比了。評分先看折返次數，同分再比總行程 —— 跟規劃器
+// 判斷「哪種手法好開」用的是同一個順序。
+
+const CH_KEY = STORE_KEY + '/challenges';
+
+let bestRuns = loadBests();
+let parWorker = null;
+let parSeq = 0;
+
+function loadBests() {
+  try { return JSON.parse(localStorage.getItem(CH_KEY)) || {}; } catch (err) { return {}; }
+}
+function saveBests() {
+  // 存不進去（無痕視窗、封鎖網站資料）就算了，挑戰照樣能玩，只是紀錄留不住。
+  try { localStorage.setItem(CH_KEY, JSON.stringify(bestRuns)); } catch (err) { /* 忽略 */ }
+}
+
+/** 關卡的場景設定：一律從預設值長出來，不受使用者調過的設定影響。 */
+function challengeCfg(def) {
+  const out = {
+    ...DEFAULT_SCENE,
+    ...(def.patch || {}),
+    vehicle: { ...DEFAULT_SCENE.vehicle },
+    approachFrom: 'left',
+    parkDirection: 'right',
+    entryStyle: 'any',
+    obstacles: DEFAULT_OBSTACLES
+      .filter(o => !(def.without || []).includes(o.id))
+      .map(o => ({ ...o })),
+  };
+  for (const [id, dx] of Object.entries(def.nudge || {})) {
+    const o = out.obstacles.find(x => x.id === id);
+    if (o) o.x += dx;
+  }
+  return out;
+}
+
+function scoreOf() {
+  return { reversals: manualReversals(), cost: manualCost() };
+}
+/** a 比 b 好嗎：折返次數優先，同分才比行程。 */
+function beats(a, b) {
+  if (!b) return true;
+  if (a.reversals !== b.reversals) return a.reversals < b.reversals;
+  return a.cost < b.cost - 1e-9;
+}
+function fmtScore(s) {
+  return s ? `折 ${s.reversals} 次 · ${s.cost.toFixed(2)}m` : '—';
+}
+
+/** 連按同方向、同角度的那幾下併成一段，回放的步驟表才讀得下去。 */
+function mergeSegs(segs) {
+  const out = [];
+  for (const s of segs) {
+    const last = out[out.length - 1];
+    if (last && last.steer === s.steer && Math.sign(last.dist) === Math.sign(s.dist)) last.dist += s.dist;
+    else out.push({ ...s });
+  }
+  return out;
+}
+
+/** 把一串手動指令變成跟規劃結果同形狀的物件，就能直接餵給既有的播放器。 */
+function runAsPlan(segs, from) {
+  const merged = mergeSegs(segs);
+  let reversals = 0;
+  for (let i = 1; i < merged.length; i++) {
+    if (Math.sign(merged[i].dist) !== Math.sign(merged[i - 1].dist)) reversals++;
+  }
+  return {
+    poses: expandPoses(from, merged, scene.v.wheelbase, POSE_STRIDE),
+    segments: merged,
+    reversals,
+    cost: merged.reduce((sum, x) => sum + Math.abs(x.dist), 0),
+  };
+}
+
+/** 把一條路徑掛上既有的時間軸播放器。 */
+function showPath(p) {
+  plan = p;
+  playhead = 0;
+  renderSegments();
+  $('#timeline').hidden = false;
+  $('#scrub').max = p.poses.length - 1;
+  setPlaying(true);
+  invalidate();
+}
+
+function setSceneLocked(on) {
+  for (const id of ['#panelVehicle', '#panelLane', '#panelObstacles']) $(id).classList.toggle('locked', on);
+  $('#approach').disabled = on;
+  $('#entry').disabled = on;
+  // 「放到定位」是把車瞬移進車位，挑戰時等於一鍵過關，要一起鎖掉。
+  // 「回到起點」留著 —— 它跟「重來」是同一件事。
+  $('#toGoal').disabled = on;
+}
+
+function startChallenge(def) {
+  // 只在「從非挑戰狀態進來」時備份，換關卡不能把備份蓋成上一關的配置。
+  if (!challenge) userCfg = JSON.parse(JSON.stringify(cfg));
+  Object.assign(cfg, challengeCfg(def));
+  renderObstacles();
+  syncControls();
+  rebuild();                    // 順便把車放回起點、計數歸零
+  challenge = { def, startPose: { ...scene.start }, par: null, parState: '計算中…', done: false };
+  setSceneLocked(true);
+  $('#chResult').hidden = true;
+  requestPar();
+  renderChallenge();
+  setTip(`挑戰「${def.name}」：${def.hint} 用 A／D（或左右鍵）把車停進車位。`);
+}
+
+function quitChallenge() {
+  challenge = null;
+  setSceneLocked(false);
+  if (userCfg) {
+    Object.assign(cfg, userCfg);
+    userCfg = null;
+    renderObstacles();
+    syncControls();
+    rebuild();
+  }
+  renderChallenge();
+  setTip('已離開挑戰，場景換回你自己的設定了。');
+}
+
+function finishChallenge() {
+  challenge.done = true;
+  const score = scoreOf();
+  const isBest = beats(score, bestRuns[challenge.def.id]);
+  if (isBest) {
+    bestRuns[challenge.def.id] = { ...score, segs: mergeSegs(manualSegs) };
+    saveBests();
+  }
+  const par = challenge.par;
+  const vs = !par ? ''
+    : score.reversals < par.reversals ? ' 比規劃器還少折，漂亮。'
+    : score.reversals === par.reversals ? ' 跟規劃器打平。'
+    : ` 規劃器只折 ${par.reversals} 次。`;
+  const box = $('#chResult');
+  box.hidden = false;
+  box.className = 'ch-result ' + (isBest ? 'best' : 'done');
+  box.innerHTML = `<b>停進去了 —— ${fmtScore(score)}。</b>`
+    + (isBest ? '這是你在這一關的最佳成績。' : `最佳仍是 ${fmtScore(bestRuns[challenge.def.id])}。`)
+    + vs;
+  renderChallenge();
+}
+
+/**
+ * 電腦成績跑在自己的 worker 上。跟使用者手動按的「規劃停入路徑」共用一個的話，
+ * 兩邊的序號會互相把對方的結果作廢，先按的那個就永遠等不到答案。
+ */
+function requestPar() {
+  if (!parWorker) {
+    parWorker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+    parWorker.onmessage = (e) => {
+      const d = e.data;
+      if (d.id !== parSeq || !challenge || d.adviceOnly) return;
+      if (d.ok) {
+        challenge.par = { poses: d.poses, segments: d.segments, reversals: d.reversals, cost: d.cost };
+        challenge.parState = null;
+      } else {
+        challenge.parState = '這一關規劃器也停不進去';
+      }
+      renderChallenge();
+      invalidate();
+    };
+  }
+  parWorker.postMessage({ id: ++parSeq, cfg: { ...cfg }, mode: 'park', purpose: 'par', noAdvice: true });
+}
+
+function renderChallenge() {
+  const list = $('#chList');
+  list.innerHTML = '';
+  for (const def of CHALLENGES) {
+    const b = document.createElement('button');
+    const best = bestRuns[def.id];
+    b.innerHTML = `${def.name}<span class="ch-medal">${best ? '最佳 ' + fmtScore(best) : '尚未通關'}</span>`;
+    if (challenge && challenge.def.id === def.id) b.classList.add('on');
+    b.onclick = () => startChallenge(def);
+    list.appendChild(b);
+  }
+  $('#chLive').hidden = !challenge;
+  $('#cmpWrap').hidden = !(challenge && challenge.par);
+  if (!challenge) return;
+  $('#chName').textContent = challenge.def.name;
+  $('#chHint').textContent = challenge.def.hint;
+  $('#chNow').textContent = fmtScore(scoreOf());
+  $('#chBest').textContent = fmtScore(bestRuns[challenge.def.id]);
+  $('#chPar').textContent = challenge.par ? fmtScore(challenge.par) : (challenge.parState || '—');
+}
+
+$('#chQuit').onclick = quitChallenge;
+$('#chRetry').onclick = () => {
+  if (!challenge) return;
+  resetTo(challenge.startPose);
+  challenge.done = false;
+  $('#chResult').hidden = true;
+  renderChallenge();
+  setTip('重來一次。');
+};
+$('#chReplay').onclick = () => {
+  if (!challenge) return;
+  if (!manualSegs.length) { setTip('這一趟還沒開過，沒有東西可以回放。'); return; }
+  showPath(runAsPlan(manualSegs, challenge.startPose));
+  setTip('回放你剛才那一趟。' + (challenge.par ? '勾下面那個框可以同時看規劃器怎麼走。' : ''));
+};
+renderChallenge();
 
 $('#planBtn').onclick = () => requestPlan('park');
 $('#exitBtn').onclick = () => requestPlan('exit');
@@ -799,7 +1040,7 @@ $('#playBtn').onclick = () => {
 };
 $('#scrub').oninput = (e) => { setPlaying(false); playhead = +e.target.value; syncScrub(); invalidate(); };
 
-for (const [id, key] of [['optSweep', 'sweep'], ['optTrace', 'trace'], ['optClear', 'clear'], ['optGhost', 'ghost']]) {
+for (const [id, key] of [['optSweep', 'sweep'], ['optTrace', 'trace'], ['optClear', 'clear'], ['optGhost', 'ghost'], ['optCompare', 'compare']]) {
   $('#' + id).onchange = (e) => { opts[key] = e.target.checked; saveSoon(); invalidate(); };
 }
 
@@ -1008,7 +1249,7 @@ function syncControls() {
   }
   $('#approach').value = cfg.approachFrom;
   $('#entry').value = cfg.entryStyle;
-  for (const [id, key] of [['optSweep', 'sweep'], ['optTrace', 'trace'], ['optClear', 'clear'], ['optGhost', 'ghost']]) {
+  for (const [id, key] of [['optSweep', 'sweep'], ['optTrace', 'trace'], ['optClear', 'clear'], ['optGhost', 'ghost'], ['optCompare', 'compare']]) {
     $('#' + id).checked = opts[key];
   }
   setStep(opts.step);

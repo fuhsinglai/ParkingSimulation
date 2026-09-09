@@ -356,25 +356,30 @@ export function drawSweep(ctx, poses, v, upto = poses.length) {
 }
 
 /** 後軸中心軌跡；倒車段用不同顏色，一眼看出折了幾次。 */
-export function drawTrace(ctx, poses, upto = poses.length) {
+export function drawTrace(ctx, poses, upto = poses.length, opts = {}) {
   if (poses.length < 2) return;
-  ctx.lineWidth = 0.075;
+  ctx.save();
+  // 對照用的軌跡畫細一點、灰一點，免得跟自己開的那條搶視線。
+  ctx.lineWidth = opts.ghost ? 0.05 : 0.075;
+  if (opts.ghost) ctx.globalAlpha = 0.55;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   let i = 1;
   while (i < upto) {
     const dir = poses[i].dir;
-    ctx.strokeStyle = dir < 0 ? '#ffb648' : '#4b9cff';
+    ctx.strokeStyle = opts.ghost ? '#9aa3ad' : (dir < 0 ? '#ffb648' : '#4b9cff');
     ctx.beginPath();
     ctx.moveTo(poses[i - 1].x, poses[i - 1].y);
     while (i < upto && poses[i].dir === dir) { ctx.lineTo(poses[i].x, poses[i].y); i++; }
     ctx.stroke();
   }
+  ctx.restore();
 }
 
 export function drawCar(ctx, pose, v, opts = {}) {
   const { hit = false, steer = 0 } = opts;
   ctx.save();
+  if (opts.ghost) ctx.globalAlpha = 0.3;
   ctx.translate(pose.x, pose.y);
   ctx.rotate(pose.theta);
 

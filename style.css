@@ -258,3 +258,29 @@ kbd {
 }
 .steps-pick button.on { background: var(--blue); border-color: var(--blue); color: #fff; }
 .steps-pick span { font-size: .72rem; color: var(--muted); margin-left: 2px; }
+
+/* ---------------------------------------------------------------- 挑戰 */
+
+.ch-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ch-list button {
+  flex: 1 1 auto; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--card); color: var(--ink); cursor: pointer; text-align: left; line-height: 1.25;
+}
+.ch-list button:hover { border-color: #bfd6f5; background: #f5f9ff; }
+.ch-list button.on { background: #e9f2ff; border-color: #bfd6f5; color: #1459a6; font-weight: 700; }
+.ch-list .ch-medal { display: block; font-size: .74rem; color: var(--muted); font-weight: 500; }
+.ch-list button.on .ch-medal { color: #3f7cc4; }
+
+.ch-live { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.ch-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ch-head b { font-size: 1.02rem; }
+
+/* 過關訊息。三種語氣：破紀錄、過關、還沒過。 */
+.ch-result { border-radius: 8px; padding: 9px 11px; margin: 10px 0; font-size: .88rem; line-height: 1.5; }
+.ch-result.best { background: #e9f7f1; color: #08744d; }
+.ch-result.done { background: #fff4df; color: #885306; }
+
+/* 挑戰進行中，出題用的設定面板鎖住 —— 改場景等於改題目。 */
+.locked { opacity: .45; pointer-events: none; }
+
+.tl-cmp { margin-top: 8px; }

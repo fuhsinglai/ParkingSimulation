@@ -91,11 +91,32 @@
           <input id="scrub" type="range" min="0" max="100" value="0" step="1" aria-label="路徑進度">
           <span class="tl-pos" id="scrubPos">0.00 m</span>
         </div>
+        <label class="check tl-cmp" id="cmpWrap" hidden><input id="optCompare" type="checkbox">同時顯示規劃器的路徑（灰色）</label>
         <ol class="seglist" id="seglist"></ol>
       </div>
     </div>
 
     <aside class="side">
+
+      <div class="panel pad" id="panelChallenge">
+        <h2>挑戰</h2>
+        <p class="note">選一關，車會回到起點、計數歸零。目標是把車停進車位，<b>折返次數越少越好</b>，同分再比總行程。</p>
+        <div class="ch-list" id="chList"></div>
+        <div class="ch-live" id="chLive" hidden>
+          <div class="ch-head"><b id="chName">—</b><button class="btn db-s" id="chQuit">結束挑戰</button></div>
+          <p class="note" id="chHint"></p>
+          <div class="ch-result" id="chResult" hidden></div>
+          <table class="facts">
+            <tr><th>你這次</th><td id="chNow">折 0 次 · 0.00m</td></tr>
+            <tr><th>你的最佳</th><td id="chBest">—</td></tr>
+            <tr><th>規劃器</th><td id="chPar">計算中…</td></tr>
+          </table>
+          <div class="row">
+            <button class="btn grow" id="chRetry">↺ 重來</button>
+            <button class="btn play grow" id="chReplay">▶ 回放這次</button>
+          </div>
+        </div>
+      </div>
 
       <div class="panel pad">
         <h2>可行性分析</h2>
@@ -121,7 +142,7 @@
         <label class="check"><input id="optGhost" type="checkbox" checked>目標停車位置</label>
       </div>
 
-      <details class="panel pad">
+      <details class="panel pad" id="panelVehicle">
         <summary>車輛規格</summary>
         <div class="setting"><label for="vLength">車長</label><input id="vLength" type="range" min="3.2" max="5.6" value="4.60" step=".01"><output id="vLengthO">4.60m</output></div>
         <div class="setting"><label for="vWidth">車寬</label><input id="vWidth" type="range" min="1.5" max="2.1" value="1.855" step=".005"><output id="vWidthO">1.86m</output></div>
@@ -135,7 +156,7 @@
         <p class="note"><b>最小迴轉半徑</b>填規格表上那個數字（量的是外前輪）。RAV4 PHEV 原廠 19 吋是 5.70m、一般版 17 吋 5.50m。<b>換非原廠輪圈沒有規格可查</b> —— 加寬的輪圈常因輪拱間隙限制轉向角，實際會再大一些。<br>要實測：空曠處方向盤打到底繞一整圈，量外側前輪畫出來那個圓的直徑，除以 2。</p>
       </details>
 
-      <details class="panel pad" open>
+      <details class="panel pad" open id="panelLane">
         <summary>巷道與車位</summary>
         <div class="setting"><label for="alley">建物間總寬</label><input id="alley" type="range" min="3.6" max="8" value="5.9" step=".05"><output id="alleyO">5.90m</output></div>
         <div class="setting"><label for="houseFront">屋前空間長度</label><input id="houseFront" type="range" min="4" max="14" value="6.10" step=".05"><output id="houseFrontO">6.10m</output></div>
@@ -155,7 +176,7 @@
         <p class="note"><b>大門只是牆上的參照物</b>，不佔車位、不進碰撞檢查 —— 車照樣可以停在門前。它只用來檢查停好之後剩下的開口，人還走不走得出去。</p>
       </details>
 
-      <details class="panel pad" open>
+      <details class="panel pad" open id="panelObstacles">
         <summary>障礙物（位置與尺寸都可調）</summary>
         <div id="obstacleList"></div>
         <div class="row" style="margin-top:12px">

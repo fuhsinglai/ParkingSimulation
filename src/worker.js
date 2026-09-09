@@ -12,7 +12,7 @@ import { suggestFixes } from './advice.js';
 const HARD_REVERSALS = 8;
 
 self.onmessage = (e) => {
-  const { id, cfg, mode } = e.data;
+  const { id, cfg, mode, purpose = null, noAdvice = false } = e.data;
   const t0 = Date.now();
   const scene = buildScene(cfg);
   // 駛出與停入共用同一套規劃器，差別只在起點／終點怎麼給。
@@ -22,6 +22,7 @@ self.onmessage = (e) => {
   const payload = {
     id,
     mode,
+    purpose,
     elapsed: Date.now() - t0,
     ok: result.ok,
     reason: result.reason || null,
@@ -41,7 +42,8 @@ self.onmessage = (e) => {
 
   // 路徑先送出去（約 0.1 秒），建議另外算完再補送。
   // 綁在一起的話，使用者要為了那幾條 what-if 多等好幾秒才看得到路徑。
-  const wantAdvice = !result.ok || result.reversals >= HARD_REVERSALS;
+  // 挑戰的「電腦成績」只要路徑，不必花好幾秒去算 what-if 建議。
+  const wantAdvice = !noAdvice && (!result.ok || result.reversals >= HARD_REVERSALS);
   payload.advicePending = wantAdvice;
   self.postMessage(payload);
 
@@ -51,6 +53,6 @@ self.onmessage = (e) => {
       entryStyle: result.entry || cfg.entryStyle,
       budgetMs: 5000,
     }).suggestions;
-    self.postMessage({ id, mode, adviceOnly: true, advice });
+    self.postMessage({ id, mode, purpose, adviceOnly: true, advice });
   }
 };
