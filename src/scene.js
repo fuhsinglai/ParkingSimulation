@@ -145,9 +145,11 @@ export function buildScene(cfg, vIn) {
   // 倒車入庫：已經開過車位、與前車並排 —— 車尾大約與車位前緣切齊，
   // 這才是實際的起手式；把車跨在空車位上倒不進去。
   const past = laneAt(fromRight ? slot.start - 0.30 : slot.end + 0.30, 'rear');
-  // 倒車入庫的起手式本來就是「先開過車位」，畫面上的起點要跟著換，
-  // 不然選了倒車入庫卻什麼都沒變，看起來像沒生效。
-  const start = cfg.entryStyle === 'reverse' ? past : before;
+  // 起點只由「從哪頭開進來」決定：從左邊進就停在車位左邊，從右邊進就在右邊。
+  // 倒車入庫確實要先開過車位，但那是路徑的一部分，不是起點 —— 拿 past 當起點
+  // 等於先幫駕駛把前半段開完了，畫面上看起來像車子憑空跳到對面去。
+  // past 仍然留在 lanePoses 裡，只當搜尋的方向參考。
+  const start = before;
 
   return {
     cfg, v, obstacles, goal, slot, bodyOffset,

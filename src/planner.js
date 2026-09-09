@@ -90,7 +90,10 @@ function heuristic(p, goals) {
 }
 
 function atGoal(p, goals, accept) {
-  if (accept && accept(p)) return true;
+  // 有 accept 就代表終點是一個「區域」，goals 只是啟發式的方向參考。
+  // 這時候不能再認引導點 —— 引導點本來就可能落在區域外（停入時會拿另一頭的
+  // 車道姿態當方向參考），碰到它就收工會讓搜尋停在錯的那一頭。
+  if (accept) return accept(p);
   return goals.some(g => Math.hypot(g.x - p.x, g.y - p.y) < POS_TOL
     && Math.abs(normAngle(g.theta - p.theta)) < ANG_TOL);
 }
@@ -122,16 +125,24 @@ export function parkedRegion(scene) {
  *
  * 原本只給兩個固定的車道姿態（還沒過車位／已經過車位），但實際起手位置是浮動的 ——
  * 用折車法時根本不會乖乖停在前車旁邊。寫死成兩點會排除掉真正好用的路徑。
+ *
+ * side='approach' 只認「進來的那一頭」：停入的起點必須是駕駛真正開進巷子的位置，
+ * 從左邊進就得在車位左邊。開過車位再倒回來是路徑的一部分，不能當成起點。
+ * side='any' 兩頭都認，駛出用 —— 離開時要往哪一頭走是駕駛的自由。
  */
-export function laneRegion(scene) {
+export function laneRegion(scene, side = 'any') {
   const half = scene.v.length / 2;
   const theta = scene.start.theta;
   const minY = scene.cfg.wallGap + scene.v.width / 2 + 0.30;
+  const fromRight = scene.cfg.approachFrom === 'right';
   return (p) => {
     if (Math.abs(normAngle(p.theta - theta)) > ANG_TOL) return false;
     if (p.y < minY) return false;
     const bodyCx = p.x + scene.bodyOffset * Math.cos(p.theta);
-    return bodyCx - half > scene.slot.end || bodyCx + half < scene.slot.start;
+    const pastEnd = bodyCx - half > scene.slot.end;
+    const beforeStart = bodyCx + half < scene.slot.start;
+    if (side === 'approach') return fromRight ? pastEnd : beforeStart;
+    return pastEnd || beforeStart;
   };
 }
 
@@ -479,9 +490,14 @@ export function planParking(scene, opts) {
   // 起手位置本來就是浮動的，寫死會排除掉真正好用的路徑。
   // 兩個代表性車道姿態仍然保留，但只當啟發式的方向參考：同一個區域用不同方向
   // 引導，搜到的路徑不一樣（格子去重是有損的），兩個都試才不會漏。
-  o.accept = laneRegion(scene);
+  // 停入時只接受「進來的那一頭」當起點，駛出時兩頭都行。
+  o.accept = laneRegion(scene, wantPark ? 'approach' : 'any');
   const lanes = scene.lanePoses || [scene.start];
-  const laneOrder = style === 'reverse' ? [lanes[1], lanes[0]] : [lanes[0], lanes[1]];
+  // 兩個車道姿態都只是啟發式的方向參考。停入時終點固定在進來的那一頭，
+  // 所以先用該側引導；引導到另一頭仍然有用 —— 倒車入庫的路徑本來就會先繞過去。
+  const laneOrder = wantPark
+    ? [lanes[0], lanes[1]]
+    : (style === 'reverse' ? [lanes[1], lanes[0]] : [lanes[0], lanes[1]]);
 
   const tiers = [
     // 第 0 層：低貪婪度，先試著找「開起來漂亮」的路徑（少折、少無謂動作）。
