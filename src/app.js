@@ -709,15 +709,36 @@ $('#steer').oninput = (e) => {
   $('#steerOut').textContent = describeSteer(steerDeg, scene.v);
   invalidate();
 };
-/** 方向盤按鈕：一次打 1/4 個行程，連按就到底。滑桿仍在，要微調用滑桿。 */
-function nudgeSteer(dir) {
+/** 設定方向盤角度：夾在這台車的最大轉向角內，並同步滑桿與讀數。 */
+function setSteer(deg) {
   const max = scene.v.maxSteerDeg;
-  steerDeg = dir === 0 ? 0 : Math.max(-max, Math.min(max, steerDeg + dir * max / 4));
-  steerDeg = Math.round(steerDeg * 10) / 10;
+  steerDeg = Math.round(Math.max(-max, Math.min(max, deg)) * 10) / 10;
   $('#steer').value = steerDeg;
   $('#steerOut').textContent = describeSteer(steerDeg, scene.v);
   invalidate();
 }
+/** 方向盤按鈕：一次打 1/4 個行程，連按就到底。滑桿仍在，要微調用滑桿。 */
+function nudgeSteer(dir) {
+  setSteer(dir === 0 ? 0 : steerDeg + dir * scene.v.maxSteerDeg / 4);
+}
+
+/**
+ * 滑鼠滾輪轉方向盤：往上滾＝打向外側，跟滑桿往右同一個方向，一格 2 度。
+ *
+ * 只在圖上與駕駛列接管滾輪，其他地方照常捲頁面 —— 眼睛盯著車看的時候手不用移開，
+ * 但整頁還是捲得動。要一次打到底用 A／D 按鈕，那是一次 1/4 個行程。
+ *
+ * 沒有做 Shift 加速：Windows 上 Shift＋滾輪會被瀏覽器轉成水平捲動，
+ * deltaY 直接變成 0，加速鍵反而會讓方向盤不動。
+ */
+const WHEEL_STEER_DEG = 2;
+function wheelSteer(e) {
+  if (!e.deltaY) return;
+  setSteer(steerDeg - Math.sign(e.deltaY) * WHEEL_STEER_DEG);
+  e.preventDefault();
+}
+canvas.addEventListener('wheel', wheelSteer, { passive: false });
+$('.drivebar').addEventListener('wheel', wheelSteer, { passive: false });
 /**
  * 每次移動的距離。預設 10cm —— 車位只剩十幾公分餘裕時，25cm 一步就過頭了。
  * 想快速移動再切到 25/50cm。
@@ -941,11 +962,7 @@ addEventListener('keydown', (e) => {
   if (k === 'q') { nudgeSteer(0); e.preventDefault(); return; }
 
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-    const max = scene.v.maxSteerDeg;
-    steerDeg = Math.max(-max, Math.min(max, steerDeg + (e.key === 'ArrowLeft' ? -2 : 2)));
-    $('#steer').value = steerDeg;
-    $('#steerOut').textContent = describeSteer(steerDeg, scene.v);
-    invalidate();
+    setSteer(steerDeg + (e.key === 'ArrowLeft' ? -WHEEL_STEER_DEG : WHEEL_STEER_DEG));
     e.preventDefault();
     return;
   }
