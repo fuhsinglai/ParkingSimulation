@@ -447,13 +447,40 @@ export function drawCar(ctx, pose, v, opts = {}) {
 
   // 充電口（駕駛座前面一點，車身左側）
   if (opts.portFromNose) {
+    const px = nose - opts.portFromNose;
+    const py = -hw + 0.06;
     ctx.beginPath();
-    ctx.arc(nose - opts.portFromNose, -hw + 0.06, 0.12, 0, Math.PI * 2);
+    ctx.arc(px, py, 0.12, 0, Math.PI * 2);
     ctx.fillStyle = '#17a673';
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 0.035;
     ctx.stroke();
+
+    // 標籤掛在車身外側、正對著孔。跟著車身轉的話車頭朝左時會變成倒著讀，
+    // 所以先把旋轉轉回來再寫字，位置用同一組角度自己算。
+    ctx.save();
+    ctx.rotate(-pose.theta);
+    const cs = Math.cos(pose.theta), sn2 = Math.sin(pose.theta);
+    const ax = px, ay = py - 0.46;
+    const lx = ax * cs - ay * sn2, ly = ax * sn2 + ay * cs;
+    ctx.beginPath();
+    ctx.moveTo(px * cs - py * sn2, px * sn2 + py * cs);
+    ctx.lineTo(lx, ly + 0.17);
+    ctx.strokeStyle = '#17a673';
+    ctx.lineWidth = 0.05;
+    ctx.stroke();
+    roundRect(ctx, lx - 0.52, ly - 0.2, 1.04, 0.4, 0.13);
+    ctx.fillStyle = '#17a673';
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 0.045;
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 0.25px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('充電孔', lx, ly + 0.09);
+    ctx.restore();
   }
 
   // 「車頭」二字永遠正著寫，車身轉過來也讀得到
