@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111b24">
+<title>RAV4 窄巷停車模擬器</title>
+<meta name="description" content="以自行車模型與 Hybrid A* 實際求解的窄巷平行停車模擬器。">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="app">
+
+  <header>
+    <div>
+      <h1>RAV4 窄巷停車模擬器</h1>
+      <div class="sub">路徑不是畫出來的，是用車輛運動學＋碰撞檢查搜出來的</div>
+    </div>
+    <div class="status" id="status"><span class="dot"></span><span id="statusText">準備</span></div>
+  </header>
+
+  <section class="layout">
+
+    <div class="panel">
+      <div class="canvas-wrap">
+        <canvas id="scene" aria-label="俯視窄巷平行停車場景"></canvas>
+        <div class="legend">
+          <div><i style="background:#fff;border:1px solid #333"></i>你的 RAV4</div>
+          <div><i style="background:#aeb7c0"></i>對面白車</div>
+          <div><i style="background:#df8737"></i>機車／固定障礙</div>
+          <div><i style="background:#4b9cff"></i>前進軌跡</div>
+          <div><i style="background:#ffb648"></i>倒車軌跡</div>
+          <div><i style="background:rgba(90,160,255,.35)"></i>車身掃掠面積</div>
+          <div><i style="background:#17a673;border:1.5px solid #fff;box-shadow:0 0 0 1px #0b5f45"></i>充電器</div>
+          <div><i style="background:#e6ebee;border:1px dashed #5b6870"></i>大門（牆上開口）</div>
+        </div>
+        <div class="hud" id="hud">
+          <label class="hud-f"><span>從哪頭開進來</span><select id="approach">
+            <option value="left">巷子左邊</option>
+            <option value="right">巷子右邊</option>
+          </select></label>
+          <div class="hud-f"><span>停妥車頭朝</span><b class="hud-derived" id="parkDirOut">右</b></div>
+          <label class="hud-f"><span>入庫方式</span><select id="entry">
+            <option value="any">自動</option>
+            <option value="reverse">倒車入庫</option>
+            <option value="forward">前進入庫</option>
+          </select></label>
+          <div class="hud-sep"></div>
+          <div class="hud-n"><b id="hSlot">—</b><span>可用車位</span></div>
+          <div class="hud-n"><b id="hIdeal">—</b><span>單次進入需求</span></div>
+          <div class="hud-n"><b id="hNarrow">—</b><span>巷道最窄</span></div>
+          <div class="hud-n"><b id="hGate">—</b><span>大門可通行</span></div>
+          <div class="hud-n"><b id="hFarGate">—</b><span>對面大門可通行</span></div>
+          <div class="hud-n"><b id="hCharge">—</b><span>充電線長度</span></div>
+        </div>
+        <div class="tip" id="tip">直接在圖上<b>拖曳</b>障礙物就能調位置：拖中間搬動、拖左右端改長度、拖面向巷道那一邊改突出深度。牆上的<b>大門</b>與<b>充電器</b>也能拖（拖大門兩端可改寬度）。</div>
+      </div>
+
+      <div class="drivebar">
+        <div class="db-row">
+          <div class="db-group">
+            <button class="btn db-s" id="steerWall">◀ 打向牆側<kbd>A</kbd></button>
+            <button class="btn db-s" id="steerZero">回正<kbd>Q</kbd></button>
+            <button class="btn db-s" id="steerOut2">打向外側 ▶<kbd>D</kbd></button>
+          </div>
+          <input id="steer" type="range" min="-33" max="33" value="0" step="1" aria-label="前輪轉向角度">
+          <output id="steerOut" class="db-out">回正</output>
+        </div>
+        <div class="db-row">
+          <button class="btn reverse db-drive" id="reverse">▼ 倒車 <b id="stepBack">10</b>cm<kbd>S</kbd></button>
+          <button class="btn forward db-drive" id="forward">▲ 前進 <b id="stepFwd">10</b>cm<kbd>W</kbd></button>
+          <div class="steps-pick" id="stepPick" role="group" aria-label="每次移動距離">
+            <button data-step="0.02">2</button><button data-step="0.05">5</button><button data-step="0.10">10</button><button data-step="0.25">25</button><button data-step="0.50">50</button><span>cm</span>
+          </div>
+          <div class="db-read">
+            <span><b id="mHeading">0°</b>車身角度</span>
+            <span><b id="mClear">—</b>最近間隙</span>
+            <span><b id="mMoves">0</b>移動次數</span>
+          </div>
+          <button class="btn db-s" id="undo">↶ 上一步</button>
+          <button class="btn db-s" id="toStart">回到起點</button>
+          <button class="btn db-s" id="toGoal">放到定位</button>
+        </div>
+        <p class="note db-hint" id="hint"><b>W</b>／<b>S</b> 前進倒車，<b>A</b>／<b>D</b> 方向盤打 1/4 個行程，<b>Q</b> 回正。方向鍵 <b>↑↓</b> 同前進倒車，<b>←→</b> 微調 2 度，<b>空白鍵</b> 播放／暫停。</p>
+      </div>
+
+      <div class="timeline" id="timeline" hidden>
+        <div class="tl-row">
+          <button class="btn play" id="playBtn">▶ 播放</button>
+          <input id="scrub" type="range" min="0" max="100" value="0" step="1" aria-label="路徑進度">
+          <span class="tl-pos" id="scrubPos">0.00 m</span>
+        </div>
+        <ol class="seglist" id="seglist"></ol>
+      </div>
+    </div>
+
+    <aside class="side">
+
+      <div class="panel pad">
+        <h2>可行性分析</h2>
+        <div class="verdict" id="verdict">尚未計算</div>
+        <table class="facts">
+          <tr><th>你的可用車位</th><td id="fSlot">—</td></tr>
+          <tr><th>單次進入最短需求</th><td id="fIdeal">—</td></tr>
+          <tr><th>巷道最窄處</th><td id="fWidth">—</td></tr>
+          <tr><th>後軸最小迴轉半徑</th><td id="fRadius">—</td></tr>
+        </table>
+        <div class="row">
+          <button class="btn primary grow" id="planBtn">⌕ 規劃停入路徑</button>
+          <button class="btn play grow" id="exitBtn">↗ 規劃駛出</button>
+        </div>
+        <p class="note" id="planNote">會實際搜尋不碰撞的路徑；車位越緊，算越久（最多約 10 秒）。</p>
+      </div>
+
+      <div class="panel pad">
+        <h2>顯示</h2>
+        <label class="check"><input id="optSweep" type="checkbox" checked>車身掃掠面積</label>
+        <label class="check"><input id="optTrace" type="checkbox" checked>行駛軌跡</label>
+        <label class="check"><input id="optClear" type="checkbox" checked>車角間隙標註</label>
+        <label class="check"><input id="optGhost" type="checkbox" checked>目標停車位置</label>
+      </div>
+
+      <details class="panel pad">
+        <summary>車輛規格</summary>
+        <div class="setting"><label for="vLength">車長</label><input id="vLength" type="range" min="3.2" max="5.6" value="4.60" step=".01"><output id="vLengthO">4.60m</output></div>
+        <div class="setting"><label for="vWidth">車寬</label><input id="vWidth" type="range" min="1.5" max="2.1" value="1.855" step=".005"><output id="vWidthO">1.86m</output></div>
+        <div class="setting"><label for="vWheelbase">軸距</label><input id="vWheelbase" type="range" min="2.2" max="3.2" value="2.69" step=".01"><output id="vWheelbaseO">2.69m</output></div>
+        <div class="setting"><label for="vTurn">最小迴轉半徑</label><input id="vTurn" type="range" min="4.4" max="7.2" value="5.70" step=".05"><output id="vTurnO">5.70m</output></div>
+        <table class="facts">
+          <tr><th>前輪最大轉角</th><td id="vSteer">—</td></tr>
+          <tr><th>後軸迴轉半徑</th><td id="vRear">—</td></tr>
+          <tr><th>前懸／後懸</th><td id="vOver">—</td></tr>
+        </table>
+        <p class="note"><b>最小迴轉半徑</b>填規格表上那個數字（量的是外前輪）。RAV4 PHEV 原廠 19 吋是 5.70m、一般版 17 吋 5.50m。<b>換非原廠輪圈沒有規格可查</b> —— 加寬的輪圈常因輪拱間隙限制轉向角，實際會再大一些。<br>要實測：空曠處方向盤打到底繞一整圈，量外側前輪畫出來那個圓的直徑，除以 2。</p>
+      </details>
+
+      <details class="panel pad" open>
+        <summary>巷道與車位</summary>
+        <div class="setting"><label for="alley">建物間總寬</label><input id="alley" type="range" min="3.6" max="8" value="5.9" step=".05"><output id="alleyO">5.90m</output></div>
+        <div class="setting"><label for="houseFront">屋前空間長度</label><input id="houseFront" type="range" min="4" max="14" value="6.10" step=".05"><output id="houseFrontO">6.10m</output></div>
+        <div class="setting"><label for="wallGap">靠牆保留距離</label><input id="wallGap" type="range" min=".05" max=".8" value=".20" step=".01"><output id="wallGapO">0.20m</output></div>
+        <div class="setting"><label for="targetX">想停的位置</label><input id="targetX" type="range" min="0" max="16" value="7.1" step=".1"><output id="targetXO">7.10m</output></div>
+        <div class="setting"><label for="frontGap">與鄰車間距</label><input id="frontGap" type="range" min=".05" max="2" value=".15" step=".05"><output id="frontGapO">0.15m</output></div>
+        <div class="setting"><label for="gateX">大門位置</label><input id="gateX" type="range" min="0" max="16" value="9.775" step=".025"><output id="gateXO">9.78m</output></div>
+        <div class="setting"><label for="gateWidth">大門寬度</label><input id="gateWidth" type="range" min=".6" max="4" value="1.50" step=".02"><output id="gateWidthO">1.50m</output></div>
+        <div class="setting"><label for="farGateX">對面大門位置</label><input id="farGateX" type="range" min="0" max="16" value="9.15" step=".05"><output id="farGateXO">9.15m</output></div>
+        <div class="setting"><label for="farGateWidth">對面大門寬度</label><input id="farGateWidth" type="range" min=".6" max="4" value="1.65" step=".05"><output id="farGateWidthO">1.65m</output></div>
+        <div class="setting"><label for="chargerX">充電器位置</label><input id="chargerX" type="range" min="0" max="16" value="9.5" step=".1"><output id="chargerXO">9.50m</output></div>
+        <div class="setting"><label for="portFromNose">充電口距車頭</label><input id="portFromNose" type="range" min="0.3" max="4.3" value="2.0" step=".1"><output id="portFromNoseO">2.00m</output></div>
+        <p class="note"><b>停妥車頭朝向不能選，是算出來的。</b>平行停車不管倒車或前進入庫，車最後都與牆平行、車頭沿著你進來的方向（從左邊進來＝往右開＝車頭朝右）。要停成反方向就得在巷內調頭，這條巷子做不到，所以不提供這個選項。</p>
+        <p class="note">這裡所有的<b>左右都是看圖的左右</b>（圖左＝巷子左，對應下方的公尺刻度），不是駕駛座的左右。車角讀數則用「牆側／外側」，不會隨車頭方向翻轉。</p>
+        <p class="note">「從哪頭開進來」與「停妥車頭朝」是<b>分開</b>的。兩者相反就代表過程中要調頭，規劃器會自己找，找不到就會說停不進去。</p>
+        <p class="note"><b>屋前空間長度</b>＝自家門面那一段的總長，也就是住家側兩個障礙物之間的空隙 —— 它同時就是「可用車位」。這是現場唯一量得到的數字，所以可以直接輸入：拉這根滑桿等於把「車位前方機車」搬遠或搬近，後端釘住不動。反過來搬下面的障礙物，它也會跟著變。</p>
+        <p class="note"><b>大門只是牆上的參照物</b>，不佔車位、不進碰撞檢查 —— 車照樣可以停在門前。它只用來檢查停好之後剩下的開口，人還走不走得出去。</p>
+      </details>
+
+      <details class="panel pad" open>
+        <summary>障礙物（位置與尺寸都可調）</summary>
+        <div id="obstacleList"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn grow" id="addHouse">＋ 住家側</button>
+          <button class="btn grow" id="addFar">＋ 對面側</button>
+          <button class="btn grow warn" id="resetObs">全部重設</button>
+        </div>
+        <p class="note">所有設定（含障礙物、大門、充電器）會自動存在這台裝置的瀏覽器裡。「全部重設」會把所有設定改回預設值。<br>狀態：<b id="storeState">—</b></p>
+        <p class="note">車輛尺寸採 RAV4 XA50：長 4.60m、寬 1.855m、軸距 2.69m。最大轉向角 34° 是由原廠迴轉直徑 11.0m 反推的，不是估的。</p>
+      </details>
+
+    </aside>
+  </section>
+</main>
+<script type="module" src="src/app.js"></script>
+</body>
+</html>

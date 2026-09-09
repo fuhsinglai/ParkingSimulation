@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "parking-sim",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "serve.py"
+      ],
+      "port": 8126
+    }
+  ]
+}
