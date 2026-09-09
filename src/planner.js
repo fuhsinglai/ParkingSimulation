@@ -128,7 +128,8 @@ export function parkedRegion(scene) {
  *
  * side='approach' 只認「進來的那一頭」：停入的起點必須是駕駛真正開進巷子的位置，
  * 從左邊進就得在車位左邊。開過車位再倒回來是路徑的一部分，不能當成起點。
- * side='any' 兩頭都認，駛出用 —— 離開時要往哪一頭走是駕駛的自由。
+ * side='far'      只認另一頭，也就是「已經開過車位、與前車並排」的位置。
+ * side='any'      兩頭都認，駛出用 —— 離開時要往哪一頭走是駕駛的自由。
  */
 export function laneRegion(scene, side = 'any') {
   const half = scene.v.length / 2;
@@ -142,6 +143,7 @@ export function laneRegion(scene, side = 'any') {
     const pastEnd = bodyCx - half > scene.slot.end;
     const beforeStart = bodyCx + half < scene.slot.start;
     if (side === 'approach') return fromRight ? pastEnd : beforeStart;
+    if (side === 'far') return fromRight ? beforeStart : pastEnd;
     return pastEnd || beforeStart;
   };
 }
@@ -444,7 +446,8 @@ export function idealMinSlotLength(v, wallGap, margin) {
  */
 /** 「好開程度」：總行程加上每次折返的代價。數字越小越好開。 */
 export function maneuverScore(plan) {
-  return plan.cost + plan.reversals * 0.8;
+  // 沿巷道開過車位那一段只是路過，不算停車技術的難度。
+  return plan.cost - (plan.approachCost || 0) + plan.reversals * 0.8;
 }
 
 export function planParking(scene, opts) {
@@ -490,14 +493,9 @@ export function planParking(scene, opts) {
   // 起手位置本來就是浮動的，寫死會排除掉真正好用的路徑。
   // 兩個代表性車道姿態仍然保留，但只當啟發式的方向參考：同一個區域用不同方向
   // 引導，搜到的路徑不一樣（格子去重是有損的），兩個都試才不會漏。
-  // 停入時只接受「進來的那一頭」當起點，駛出時兩頭都行。
-  o.accept = laneRegion(scene, wantPark ? 'approach' : 'any');
   const lanes = scene.lanePoses || [scene.start];
-  // 兩個車道姿態都只是啟發式的方向參考。停入時終點固定在進來的那一頭，
-  // 所以先用該側引導；引導到另一頭仍然有用 —— 倒車入庫的路徑本來就會先繞過去。
-  const laneOrder = wantPark
-    ? [lanes[0], lanes[1]]
-    : (style === 'reverse' ? [lanes[1], lanes[0]] : [lanes[0], lanes[1]]);
+  const beforeSlot = lanes[0];
+  const pastSlot = lanes[1] || lanes[0];
 
   const tiers = [
     // 第 0 層：低貪婪度，先試著找「開起來漂亮」的路徑（少折、少無謂動作）。
@@ -515,37 +513,90 @@ export function planParking(scene, opts) {
     // 那是離散化的運氣，不是幾何。換格距重試能把這種假無解濾掉。
     { label: 'shuffle2', note: '大量折返搓車', margin: 0.02, grid: 0.065, ang: Math.PI / 72, lengths: [0.13, 0.42], factors: [-1, -0.6, -0.3, 0, 0.3, 0.6, 1], switchCost: 0.30, maxExpansions: 200000, timeBudgetMs: 7000 },
   ];
-  let last = null;
-  for (const t of tiers) {
-    for (const laneGoal of laneOrder) {
-    const r = planPath(scene, { ...t, ...o, goal: laneGoal, goals: [laneGoal] });
-    if (r.ok) {
-      const out = { ...r, tier: t.label, tierNote: t.note, margin: t.margin };
-      const final = wantPark ? reversePlan(out, scene.v) : out;
-      const lastPark = (wantPark ? final.segments : [...final.segments].reverse().map(x => ({ dist: -x.dist })))
-        .slice(-1)[0];
-      final.entry = lastPark && lastPark.dist < 0 ? 'reverse' : 'forward';
-      return final;
+  /**
+   * 分層搜尋，回傳「往外方向」的原始路徑（還沒倒過來）。
+   * accept 是終點區域，laneOrder 只是啟發式的方向引導。
+   */
+  const searchOut = (starts, accept, laneOrder, firstDir) => {
+    let last = null;
+    for (const t of tiers) {
+      for (const laneGoal of laneOrder) {
+        const r = planPath(scene, {
+          ...t, ...o, starts, accept, firstDir, goal: laneGoal, goals: [laneGoal],
+        });
+        if (r.ok) return { ...r, tier: t.label, tierNote: t.note, margin: t.margin };
+        last = r;
+      }
+      // 目標位置本身放不下 -> 再細也沒用
+      if (last && last.expansions === 0) break;
     }
-    last = r;
+    return last || { ok: false, reason: '無法規劃', expansions: 0 };
+  };
+
+  /** 把往外的路徑收尾：停入要倒著走，並標出最後一步是前進還是倒車。 */
+  const finish = (raw) => {
+    const final = wantPark ? reversePlan(raw, scene.v) : raw;
+    const lastSeg = (wantPark ? final.segments : [...final.segments].reverse().map(x => ({ dist: -x.dist })))
+      .slice(-1)[0];
+    final.entry = lastSeg && lastSeg.dist < 0 ? 'reverse' : 'forward';
+    return final;
+  };
+
+  const parked = parkedPoses(scene);
+  const approachSide = laneRegion(scene, 'approach');
+
+  // 倒車入庫拆成兩段搜尋，因為它的手法本來就有兩個階段：
+  // 先沿巷道開過車位、與前車並排，再從那裡倒進去。
+  // 一次搜到底做不出這個形狀 —— 終點限在進來的那一頭時，搜尋會挑「原地前後搓」
+  // 的解，因為那條短得多，結果看起來跟前進入庫沒兩樣。
+  // 往外搜的順序是反的：先搜「車位 -> 並排位置」，再從並排位置續搜回進來那頭。
+  if (wantPark && style === 'reverse') {
+    const backIn = searchOut(parked, laneRegion(scene, 'far'), [pastSlot, beforeSlot], 1);
+    if (backIn.ok) {
+      const alongside = endOfPath(backIn.startPose, backIn.segments, scene.v);
+      const approach = searchOut([{ ...alongside }], approachSide, [beforeSlot, pastSlot], 0);
+      if (approach.ok) {
+        return finish({
+          ...backIn,
+          segments: [...backIn.segments, ...approach.segments],
+          cost: backIn.cost + approach.cost,
+          expansions: backIn.expansions + approach.expansions,
+          // 開過車位那一段是「路過」，不是停車技術的一部分。
+          // 「自動」在比哪種手法好開時要把它扣掉，否則倒車入庫永遠輸在路程上。
+          approachCost: approach.cost,
+        });
+      }
     }
-    // 目標位置本身放不下 -> 再細也沒用
-    if (last && last.expansions === 0) break;
+    // 開不過去（巷道被卡死）就退回單段搜尋：原地搓車雖然不像實際手法，
+    // 但至少是這個場地真的做得到的動作。
   }
+
+  const laneOrder = wantPark
+    ? [beforeSlot, pastSlot]
+    : (style === 'reverse' ? [pastSlot, beforeSlot] : [beforeSlot, pastSlot]);
+  const single = searchOut(parked, wantPark ? approachSide : laneRegion(scene, 'any'), laneOrder, o.firstDir || 0);
+  if (single.ok) return finish(single);
+
   // 搜尋在幾個節點內就走完，代表車子從起點根本動不了，跟「搜不到」是兩回事
-  if (last && last.expansions > 0 && last.expansions < 60) {
-    return { ok: false, reason: '車子在這個位置幾乎動彈不得：前後與側向都不夠讓車身轉出角度。', expansions: last.expansions };
+  if (single.expansions > 0 && single.expansions < 60) {
+    return { ok: false, reason: '車子在這個位置幾乎動彈不得：前後與側向都不夠讓車身轉出角度。', expansions: single.expansions };
   }
-  return { ok: false, reason: last ? last.reason : '無法規劃', expansions: last ? last.expansions : 0 };
+  return { ok: false, reason: single.reason || '無法規劃', expansions: single.expansions || 0 };
+}
+
+/** 從 pose 出發依序走完 segments，回傳終點姿態。 */
+function endOfPath(pose, segments, v) {
+  let end = pose;
+  for (const seg of segments) {
+    const n = Math.max(1, Math.ceil(Math.abs(seg.dist) / 0.02));
+    for (let i = 0; i < n; i++) end = integrate(end, seg.dist / n, seg.steer, v.wheelbase);
+  }
+  return end;
 }
 
 /** 把一條路徑倒過來走：段序顛倒、距離變號、轉角不變，起點換成原本的終點。 */
 function reversePlan(plan, v) {
-  let end = plan.startPose;
-  for (const seg of plan.segments) {
-    const n = Math.max(1, Math.ceil(Math.abs(seg.dist) / 0.02));
-    for (let i = 0; i < n; i++) end = integrate(end, seg.dist / n, seg.steer, v.wheelbase);
-  }
+  const end = endOfPath(plan.startPose, plan.segments, v);
   const segments = [...plan.segments].reverse().map(s => ({ steer: s.steer, dist: -s.dist }));
   let reversals = 0;
   for (let i = 1; i < segments.length; i++) {
