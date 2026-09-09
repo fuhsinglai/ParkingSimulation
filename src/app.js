@@ -943,11 +943,15 @@ for (const ev of ['pointerup', 'pointercancel']) {
 }
 
 /**
- * 鍵盤操作。WASD 與方向鍵各有分工：
- *   W/S、↑/↓  前進、倒車（一次 25cm）
- *   A/D       方向盤打 1/4 個行程（跟按鈕一樣，連按四下到底）
- *   ←/→       方向盤微調 2 度
- *   空白鍵     播放／暫停已規劃的路徑
+ * 鍵盤操作：
+ *   W/S     前進、倒車
+ *   ←/→     往畫面的左／右開
+ *   A/D     方向盤打 1/4 個行程（跟按鈕一樣，連按四下到底）
+ *   Q       方向盤回正
+ *   空白鍵   播放／暫停已規劃的路徑
+ *
+ * 方向盤微調交給滑鼠滾輪，↑/↓ 就沒有存在的必要了 —— 俯視圖上車只沿巷道左右走，
+ * 拿上下鍵當前進倒車反而要在腦中多轉一次。
  */
 addEventListener('keydown', (e) => {
   const tag = e.target.tagName;
@@ -955,14 +959,17 @@ addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
 
-  if (k === 'w' || e.key === 'ArrowUp') { move(1); e.preventDefault(); return; }
-  if (k === 's' || e.key === 'ArrowDown') { move(-1); e.preventDefault(); return; }
+  if (k === 'w') { move(1); e.preventDefault(); return; }
+  if (k === 's') { move(-1); e.preventDefault(); return; }
   if (k === 'a') { nudgeSteer(-1); e.preventDefault(); return; }
   if (k === 'd') { nudgeSteer(1); e.preventDefault(); return; }
   if (k === 'q') { nudgeSteer(0); e.preventDefault(); return; }
 
+  // ←/→ 是「往畫面的哪一邊開」，不是前進倒車。車頭朝右時按 → 是前進，
+  // 車頭朝左時按 → 就是倒車 —— 按鍵對應的是車子在圖上移動的方向。
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-    setSteer(steerDeg + (e.key === 'ArrowLeft' ? -WHEEL_STEER_DEG : WHEEL_STEER_DEG));
+    const noseRight = Math.cos(pose.theta) >= 0;
+    move((e.key === 'ArrowRight') === noseRight ? 1 : -1);
     e.preventDefault();
     return;
   }
