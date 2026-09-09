@@ -86,7 +86,11 @@ export function drawScene(ctx, scene, view, opts = {}) {
     if (o.kind === 'car') drawParkedCar(ctx, x, y, w, h);
     else if (o.kind === 'scooter') drawScooters(ctx, x, y, w, h);
     else drawFixed(ctx, x, y, w, h);
-    label(ctx, o.label, o.cx, o.cy, o.kind === 'car');
+    // 對面那排機車群不寫字：一台機車才 0.7m 寬，字壓在分隔線上根本讀不出來，
+    // 反而把巷道糊成一片。名稱在側欄的清單裡看得到。
+    if (!(o.side === 'far' && o.kind === 'scooter')) {
+      label(ctx, o.label, o.cx, o.cy, o.kind === 'car');
+    }
   }
 
   // 尺寸標註
@@ -308,10 +312,12 @@ function drawCharger(ctx, scene) {
   ctx.lineWidth = 0.04;
   ctx.stroke();
 
+  // 長度標在充電器正上方的牆面帶上，不放在線的中點 —— 中點會落在車位裡，
+  // 蓋住正在看的停車空間，還會跟車角間隙那些標註擠在一起。
   const label = `充電線 ${d.toFixed(2)}m`;
   ctx.font = 'bold 0.26px system-ui, sans-serif';
   const w = ctx.measureText(label).width + 0.2;
-  const mx = (charger.x + port[0]) / 2, my = (0 + port[1]) / 2;
+  const mx = charger.x, my = -1.22;   // 再高一點，不然會壓到下面「充電器」那三個字
   ctx.fillStyle = d > 5 ? 'rgba(220,81,81,.95)' : 'rgba(11,95,69,.92)';
   roundRect(ctx, mx - w / 2, my - 0.2, w, 0.4, 0.1);
   ctx.fill();
@@ -445,42 +451,18 @@ export function drawCar(ctx, pose, v, opts = {}) {
     ctx.restore();
   }
 
-  // 充電口（駕駛座前面一點，車身左側）
+  // 充電口（駕駛座前面一點，車身左側）。畫成貼在車身上的一塊綠標，像油箱蓋 ——
+  // 掛在車外的話會跟車角間隙那些標註疊在一起被蓋掉，而它們是預設開著的。
+  // 不寫字：圖上東西已經夠多，名稱在圖例與側欄裡都有。
   if (opts.portFromNose) {
     const px = nose - opts.portFromNose;
-    const py = -hw + 0.06;
-    ctx.beginPath();
-    ctx.arc(px, py, 0.12, 0, Math.PI * 2);
+    const py = -hw + 0.02;
+    roundRect(ctx, px - 0.26, py - 0.12, 0.52, 0.24, 0.08);
     ctx.fillStyle = '#17a673';
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 0.035;
-    ctx.stroke();
-
-    // 標籤掛在車身外側、正對著孔。跟著車身轉的話車頭朝左時會變成倒著讀，
-    // 所以先把旋轉轉回來再寫字，位置用同一組角度自己算。
-    ctx.save();
-    ctx.rotate(-pose.theta);
-    const cs = Math.cos(pose.theta), sn2 = Math.sin(pose.theta);
-    const ax = px, ay = py - 0.46;
-    const lx = ax * cs - ay * sn2, ly = ax * sn2 + ay * cs;
-    ctx.beginPath();
-    ctx.moveTo(px * cs - py * sn2, px * sn2 + py * cs);
-    ctx.lineTo(lx, ly + 0.17);
-    ctx.strokeStyle = '#17a673';
     ctx.lineWidth = 0.05;
     ctx.stroke();
-    roundRect(ctx, lx - 0.52, ly - 0.2, 1.04, 0.4, 0.13);
-    ctx.fillStyle = '#17a673';
-    ctx.fill();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 0.045;
-    ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 0.25px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('充電孔', lx, ly + 0.09);
-    ctx.restore();
   }
 
   // 「車頭」二字永遠正著寫，車身轉過來也讀得到
