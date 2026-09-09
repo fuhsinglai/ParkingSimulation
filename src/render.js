@@ -86,10 +86,14 @@ export function drawScene(ctx, scene, view, opts = {}) {
     if (o.kind === 'car') drawParkedCar(ctx, x, y, w, h);
     else if (o.kind === 'scooter') drawScooters(ctx, x, y, w, h);
     else drawFixed(ctx, x, y, w, h);
-    // 對面那排機車群不寫字：一台機車才 0.7m 寬，字壓在分隔線上根本讀不出來，
-    // 反而把巷道糊成一片。名稱在側欄的清單裡看得到。
-    if (!(o.side === 'far' && o.kind === 'scooter')) {
-      label(ctx, o.label, o.cx, o.cy, o.kind === 'car');
+    // 機車群一律不寫字：一台機車才 0.7m 寬，字壓在分隔線上根本讀不出來。
+    // 其他障礙物也要字放得下才寫 —— 像 0.6m 寬的電箱，字會整個溢出方塊變成一團糊。
+    // 名稱在側欄的清單裡都看得到，圖上少幾行字反而看得清楚。
+    if (o.kind !== 'scooter') {
+      ctx.font = 'bold 0.23px system-ui, sans-serif';
+      if (ctx.measureText(o.label).width < o.hx * 2 - 0.18) {
+        label(ctx, o.label, o.cx, o.cy, o.kind === 'car');
+      }
     }
   }
 
@@ -97,7 +101,8 @@ export function drawScene(ctx, scene, view, opts = {}) {
   ctx.fillStyle = 'rgba(255,255,255,.6)';
   ctx.font = '0.26px system-ui, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(`可用車位 ${slot.length.toFixed(2)}m`, slot.start + slot.length / 2, -0.34);
+  // 標在車位裡面而不是牆上那條帶子 —— 帶子上還有充電器與大門，擠在一起會互相蓋掉。
+  ctx.fillText(`可用車位 ${slot.length.toFixed(2)}m`, slot.start + slot.length / 2, 0.36);
   ctx.textAlign = 'end';
   ctx.fillText(`巷寬 ${W.toFixed(2)}m`, xMax - 0.25, W / 2 - 0.16);
   ctx.textAlign = 'start';
@@ -209,12 +214,15 @@ function drawNarrowest(ctx, scene, n) {
   const txt = `最窄 ${n.width.toFixed(2)}m`;
   ctx.font = 'bold 0.26px system-ui, sans-serif';
   const tw = ctx.measureText(txt).width + 0.2;
+  // 標在缺口靠對面那一端，不放正中間 —— 正中間正好是車要開過去的地方，會被車蓋住。
+  // 缺口太窄就沒得挑，還是放中間。
+  const ly = bottom - top > 1.0 ? bottom - 0.30 : (top + bottom) / 2;
   ctx.fillStyle = tight ? 'rgba(220,81,81,.95)' : 'rgba(23,33,42,.9)';
-  roundRect(ctx, n.x - tw / 2, (top + bottom) / 2 - 0.2, tw, 0.42, 0.1);
+  roundRect(ctx, n.x - tw / 2, ly - 0.2, tw, 0.42, 0.1);
   ctx.fill();
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
-  ctx.fillText(txt, n.x, (top + bottom) / 2 + 0.1);
+  ctx.fillText(txt, n.x, ly + 0.1);
   ctx.textAlign = 'start';
 }
 
