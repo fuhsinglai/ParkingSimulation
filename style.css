@@ -24,6 +24,7 @@ button, input { font: inherit; }
 button { touch-action: manipulation; }
 
 .app { max-width: 1280px; margin: auto; padding: 16px 16px 40px; }
+@media (min-width: 1500px) { .app { max-width: 1780px; } }
 
 header {
   display: flex; align-items: flex-end; justify-content: space-between;
@@ -58,7 +59,22 @@ h1 { font-size: clamp(1.3rem, 3vw, 1.95rem); line-height: 1.1; margin: 0; }
 body[data-tab="sim"] [data-only="setup"],
 body[data-tab="setup"] [data-only="sim"] { display: none !important; }
 
+/*
+ * 兩欄：地圖佔滿左邊，兩個側欄疊在右邊。
+ * 視窗夠寬（1500px 以上）就攤成三欄，地圖擺中間，左右各一欄 ——
+ * 寬螢幕上那兩塊留白本來就是空的，拿來放面板等於白賺，地圖也跟著變大。
+ */
 .layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, .72fr); gap: 14px; align-items: start; }
+.layout > .main { grid-column: 1; grid-row: 1 / span 2; }
+.layout > .side { grid-column: 2; grid-row: 1; }
+.layout > .side.side-left { grid-column: 2; grid-row: 2; }
+
+@media (min-width: 1500px) {
+  .layout { grid-template-columns: minmax(270px, .52fr) minmax(0, 1.85fr) minmax(300px, .66fr); }
+  .layout > .main { grid-column: 2; grid-row: 1; }
+  .layout > .side { grid-column: 3; grid-row: 1; }
+  .layout > .side.side-left { grid-column: 1; grid-row: 1; }
+}
 /*
  * 側欄自己捲，不要拖著整頁一起捲 —— 調障礙物時地圖必須留在視線裡，
  * 那正是你在調的東西。
@@ -169,6 +185,8 @@ summary { cursor: pointer; font-weight: 750; margin: -2px 0 8px; }
   .app { padding: 10px 10px 28px; }
   header { align-items: flex-start; }
   .layout { grid-template-columns: 1fr; }
+  /* 單欄時取消欄列指定，讓它們照 DOM 順序疊下去 */
+  .layout > .main, .layout > .side, .layout > .side.side-left { grid-column: 1; grid-row: auto; }
   .status { font-size: .8rem; }
   .legend { font-size: .68rem; }
   .setting { grid-template-columns: 100px 1fr 50px; }

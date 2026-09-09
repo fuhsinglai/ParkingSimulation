@@ -26,7 +26,7 @@
 
   <section class="layout">
 
-    <div class="panel">
+    <div class="panel main">
       <div class="hud" id="hud">
         <label class="hud-f"><span>從哪頭開進來</span><select id="approach">
           <option value="left">巷子左邊</option>
@@ -103,8 +103,8 @@
 
     <aside class="side">
 
-      <div class="panel pad" id="panelChallenge" data-only="sim">
-        <h2>挑戰</h2>
+      <details class="panel pad" open id="panelChallenge" data-only="sim">
+        <summary>挑戰</summary>
         <p class="note">選一關，車會回到起點、計數歸零。目標是把車停進車位，<b>折返次數越少越好</b>，同分再比總行程。</p>
         <div class="ch-list" id="chList"></div>
         <div class="ch-live" id="chLive" hidden>
@@ -121,10 +121,10 @@
             <button class="btn play grow" id="chReplay">▶ 回放這次</button>
           </div>
         </div>
-      </div>
+      </details>
 
-      <div class="panel pad" id="panelVerdict" data-only="sim">
-        <h2>可行性分析</h2>
+      <details class="panel pad" open id="panelVerdict" data-only="sim">
+        <summary>可行性分析</summary>
         <div class="verdict" id="verdict">尚未計算</div>
         <table class="facts">
           <tr><th>你的可用車位</th><td id="fSlot">—</td></tr>
@@ -137,15 +137,8 @@
           <button class="btn play grow" id="exitBtn">↗ 規劃駛出</button>
         </div>
         <p class="note" id="planNote">會實際搜尋不碰撞的路徑；車位越緊，算越久（最多約 10 秒）。</p>
-      </div>
+      </details>
 
-      <div class="panel pad" id="panelDisplay" data-only="sim">
-        <h2>顯示</h2>
-        <label class="check"><input id="optSweep" type="checkbox" checked>車身掃掠面積</label>
-        <label class="check"><input id="optTrace" type="checkbox" checked>行駛軌跡</label>
-        <label class="check"><input id="optClear" type="checkbox" checked>車角間隙標註</label>
-        <label class="check"><input id="optGhost" type="checkbox" checked>目標停車位置</label>
-      </div>
 
       <details class="panel pad" open id="panelObstacles" data-only="setup">
         <summary>障礙物（位置與尺寸都可調）</summary>
@@ -157,6 +150,21 @@
         </div>
         <p class="note">所有設定（含障礙物、大門、充電器）會自動存在這台裝置的瀏覽器裡。「全部重設」會把所有設定改回預設值。<br>狀態：<b id="storeState">—</b></p>
         <p class="note">車輛尺寸採 RAV4 XA50：長 4.60m、寬 1.855m、軸距 2.69m。最大轉向角 34° 是由原廠迴轉直徑 11.0m 反推的，不是估的。</p>
+      </details>
+
+
+
+    </aside>
+
+    <!-- 視窗夠寬時這一欄排到地圖左邊，窄一點就接在右欄下面 -->
+    <aside class="side side-left">
+
+      <details class="panel pad" open id="panelDisplay" data-only="sim">
+        <summary>顯示</summary>
+        <label class="check"><input id="optSweep" type="checkbox" checked>車身掃掠面積</label>
+        <label class="check"><input id="optTrace" type="checkbox" checked>行駛軌跡</label>
+        <label class="check"><input id="optClear" type="checkbox" checked>車角間隙標註</label>
+        <label class="check"><input id="optGhost" type="checkbox" checked>目標停車位置</label>
       </details>
 
       <details class="panel pad" open id="panelLane" data-only="setup">
