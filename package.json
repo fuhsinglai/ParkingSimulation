@@ -1,0 +1,14 @@
+{
+  "name": "parking-simulation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RAV4 窄巷平行停車模擬器：路徑用搜尋產生，每一步都做碰撞檢查",
+  "type": "module",
+  "scripts": {
+    "test": "node test/verify.mjs",
+    "start": "python serve.py"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}

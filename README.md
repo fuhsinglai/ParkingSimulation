@@ -1,5 +1,7 @@
 # RAV4 窄巷停車模擬器
 
+[![verify](https://github.com/fuhsinglai/ParkingSimulation/actions/workflows/verify.yml/badge.svg)](https://github.com/fuhsinglai/ParkingSimulation/actions/workflows/verify.yml)
+
 依現場配置重建的窄巷平行停車模擬器。與參考版（`Reference/GPT/`）最大的差別是：
 
 > **路徑不是畫出來的，是搜出來的。停不進去就照實說，並回答「那要改什麼才停得進去」。**
@@ -61,7 +63,10 @@ python serve.py 8127
 node test/verify.mjs
 ```
 
-會對每個情境重新積分、逐格檢查有沒有碰撞。
+會對每個情境重新積分、逐格檢查有沒有碰撞。有情境失敗時腳本會以非零狀態結束。
+
+每次 push 到 `main` 或開 PR，GitHub Actions 都會自動跑同一支腳本，結果看 repo 的
+Actions 頁籤，標題上的 badge 也會跟著變。
 
 **啟動不了的時候**
 
