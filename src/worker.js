@@ -1,7 +1,7 @@
 /**
  * 規劃器 worker。
  *
- * 最緊的組合可能要搜到 9 秒，放在主執行緒會整個畫面凍住。
+ * 停不進去的組合會一路搜到 12 秒的總時限，放在主執行緒會整個畫面凍住。
  * 丟到 worker 之後，UI 照常轉、可以顯示進度、也能取消。
  */
 import { buildScene, pathMinClearance } from './scene.js';

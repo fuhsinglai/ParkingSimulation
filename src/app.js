@@ -566,7 +566,7 @@ function rebuild() {
   history = [];
   moves = 0;
   $('#planBtn').textContent = '⌕ 規劃停入路徑';
-  $('#planNote').textContent = '會實際搜尋不碰撞的路徑；車位越緊，算越久（最多約 10 秒）。';
+  $('#planNote').textContent = '會實際搜尋不碰撞的路徑；車位越緊，算越久（最多約 12 秒）。';
   refreshFacts();
   invalidate();
 }

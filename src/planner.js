@@ -72,6 +72,8 @@ const DEFAULT_WEIGHT = 1.5;     // 啟發式權重，大於 1：犧牲最優性�
 
 /** 停車位置偏離「貼緊前車」每公尺要付的代價，約等於兩次折返。 */
 const PARK_BIAS = 8.0;
+/** 停妥位置容許離牆再遠一點的幾個備案，愈後面愈鬆。 */
+const PARK_DY = [0, 0.08, 0.18];
 
 const POS_TOL = 0.16;
 const ANG_TOL = 0.05;
@@ -148,8 +150,13 @@ export function laneRegion(scene, side = 'any') {
   };
 }
 
-/** 停在車位裡的幾個候選姿態 —— 駛出時當作多重起點，代表「你可能停在哪」。 */
-export function parkedPoses(scene) {
+/**
+ * 停在車位裡的幾個候選姿態 —— 駛出時當作多重起點，代表「你可能停在哪」。
+ *
+ * offsets 是允許離牆再遠一點的量。停入時前幾層只給 [0]：多留 18cm 會讓車比鄰車
+ * 凸出去，那正是最容易被刮到的地方，不該為了好搜而白送。
+ */
+export function parkedPoses(scene, offsets = PARK_DY) {
   const g = scene.goal;
   const half = scene.v.length / 2;
   const lo = scene.slot.start + half;
@@ -159,8 +166,14 @@ export function parkedPoses(scene) {
   const out = [];
   for (let bodyCx = lo; bodyCx <= hi + 1e-6; bodyCx += 0.06) {
     const bias = Math.abs(bodyCx - scene.parkBodyCx) * PARK_BIAS;
-    for (const dy of [0, 0.08, 0.18]) {
-      out.push({ x: bodyCx - scene.bodyOffset * Math.cos(g.theta), y: g.y + dy, theta: g.theta, bias });
+    // 橫向也要收一樣的代價。只給縱向偏好的話，離牆遠一點的候選位置完全免費，
+    // 搜尋當然挑好停的那個 —— 結果設定寫 15cm，停出來卻離牆 33cm，比鄰車凸出一大截。
+    // 收了代價之後只有在真的省下超過一公尺多的操作時才會退而求其次。
+    for (const dy of offsets) {
+      out.push({
+        x: bodyCx - scene.bodyOffset * Math.cos(g.theta), y: g.y + dy, theta: g.theta,
+        bias: bias + dy * PARK_BIAS,
+      });
     }
   }
   return out.length ? out : [{ ...g, bias: 0 }];
@@ -513,6 +526,11 @@ export function planParking(scene, opts) {
     // 那是離散化的運氣，不是幾何。換格距重試能把這種假無解濾掉。
     { label: 'shuffle2', note: '大量折返搓車', margin: 0.02, grid: 0.065, ang: Math.PI / 72, lengths: [0.13, 0.42], factors: [-1, -0.6, -0.3, 0, 0.3, 0.6, 1], switchCost: 0.30, maxExpansions: 200000, timeBudgetMs: 7000 },
   ];
+  // 整趟規劃的總時限。階梯本身就有六層，再乘上「先精準、不行再放寬」兩輪，
+  // 最壞情況會拖到十幾秒，久到讓人以為當掉了。實測有解的場景都在一秒內結束，
+  // 會用到這個上限的一律是無解的場景。
+  const deadline = Date.now() + (o.totalBudgetMs || 12000);
+
   /**
    * 分層搜尋，回傳「往外方向」的原始路徑（還沒倒過來）。
    * accept 是終點區域，laneOrder 只是啟發式的方向引導。
@@ -520,9 +538,12 @@ export function planParking(scene, opts) {
   const searchOut = (starts, accept, laneOrder, firstDir) => {
     let last = null;
     for (const t of tiers) {
+      const left = deadline - Date.now();
+      if (left <= 0) break;
       for (const laneGoal of laneOrder) {
         const r = planPath(scene, {
           ...t, ...o, starts, accept, firstDir, goal: laneGoal, goals: [laneGoal],
+          timeBudgetMs: Math.min(t.timeBudgetMs, Math.max(1, deadline - Date.now())),
         });
         if (r.ok) return { ...r, tier: t.label, tierNote: t.note, margin: t.margin };
         last = r;
@@ -542,7 +563,6 @@ export function planParking(scene, opts) {
     return final;
   };
 
-  const parked = parkedPoses(scene);
   const approachSide = laneRegion(scene, 'approach');
 
   // 倒車入庫拆成兩段搜尋，因為它的手法本來就有兩個階段：
@@ -550,38 +570,53 @@ export function planParking(scene, opts) {
   // 一次搜到底做不出這個形狀 —— 終點限在進來的那一頭時，搜尋會挑「原地前後搓」
   // 的解，因為那條短得多，結果看起來跟前進入庫沒兩樣。
   // 往外搜的順序是反的：先搜「車位 -> 並排位置」，再從並排位置續搜回進來那頭。
-  if (wantPark && style === 'reverse') {
-    const backIn = searchOut(parked, laneRegion(scene, 'far'), [pastSlot, beforeSlot], 1);
-    if (backIn.ok) {
-      const alongside = endOfPath(backIn.startPose, backIn.segments, scene.v);
-      const approach = searchOut([{ ...alongside }], approachSide, [beforeSlot, pastSlot], 0);
-      if (approach.ok) {
-        return finish({
-          ...backIn,
-          segments: [...backIn.segments, ...approach.segments],
-          cost: backIn.cost + approach.cost,
-          expansions: backIn.expansions + approach.expansions,
-          // 開過車位那一段是「路過」，不是停車技術的一部分。
-          // 「自動」在比哪種手法好開時要把它扣掉，否則倒車入庫永遠輸在路程上。
-          approachCost: approach.cost,
-        });
+  const attempt = (parked) => {
+    if (wantPark && style === 'reverse') {
+      const backIn = searchOut(parked, laneRegion(scene, 'far'), [pastSlot, beforeSlot], 1);
+      if (backIn.ok) {
+        const alongside = endOfPath(backIn.startPose, backIn.segments, scene.v);
+        const approach = searchOut([{ ...alongside }], approachSide, [beforeSlot, pastSlot], 0);
+        if (approach.ok) {
+          return finish({
+            ...backIn,
+            segments: [...backIn.segments, ...approach.segments],
+            cost: backIn.cost + approach.cost,
+            expansions: backIn.expansions + approach.expansions,
+            // 開過車位那一段是「路過」，不是停車技術的一部分。
+            // 「自動」在比哪種手法好開時要把它扣掉，否則倒車入庫永遠輸在路程上。
+            approachCost: approach.cost,
+          });
+        }
       }
+      // 開不過去（巷道被卡死）就退回單段搜尋：原地搓車雖然不像實際手法，
+      // 但至少是這個場地真的做得到的動作。
     }
-    // 開不過去（巷道被卡死）就退回單段搜尋：原地搓車雖然不像實際手法，
-    // 但至少是這個場地真的做得到的動作。
-  }
 
-  const laneOrder = wantPark
-    ? [beforeSlot, pastSlot]
-    : (style === 'reverse' ? [pastSlot, beforeSlot] : [beforeSlot, pastSlot]);
-  const single = searchOut(parked, wantPark ? approachSide : laneRegion(scene, 'any'), laneOrder, o.firstDir || 0);
-  if (single.ok) return finish(single);
+    const laneOrder = wantPark
+      ? [beforeSlot, pastSlot]
+      : (style === 'reverse' ? [pastSlot, beforeSlot] : [beforeSlot, pastSlot]);
+    const single = searchOut(parked, wantPark ? approachSide : laneRegion(scene, 'any'), laneOrder, o.firstDir || 0);
+    return single.ok ? finish(single) : single;
+  };
+
+  // 停入先用「設定的靠牆距離」跑完整個階梯，整組都無解才放寬。
+  //
+  // 把幾個離牆遠一點的備案跟正確位置混在一起給，等於白送：tight 層拿多留的 18cm
+  // 換到一個好搜的解就收工，永遠到不了能停在正確位置的那一層。結果設定寫 15cm、
+  // 停出來離牆 33cm，比鄰車凸出 28cm —— 那正是最容易被刮到的地方。
+  // 代價是無解的場景要多跑一輪階梯，但那本來就是最慢的情況。
+  if (wantPark) {
+    const exact = attempt(parkedPoses(scene, [0]));
+    if (exact.ok) return exact;
+  }
+  const relaxed = attempt(parkedPoses(scene, PARK_DY));
+  if (relaxed.ok) return relaxed;
 
   // 搜尋在幾個節點內就走完，代表車子從起點根本動不了，跟「搜不到」是兩回事
-  if (single.expansions > 0 && single.expansions < 60) {
-    return { ok: false, reason: '車子在這個位置幾乎動彈不得：前後與側向都不夠讓車身轉出角度。', expansions: single.expansions };
+  if (relaxed.expansions > 0 && relaxed.expansions < 60) {
+    return { ok: false, reason: '車子在這個位置幾乎動彈不得：前後與側向都不夠讓車身轉出角度。', expansions: relaxed.expansions };
   }
-  return { ok: false, reason: single.reason || '無法規劃', expansions: single.expansions || 0 };
+  return { ok: false, reason: relaxed.reason || '無法規劃', expansions: relaxed.expansions || 0 };
 }
 
 /** 從 pose 出發依序走完 segments，回傳終點姿態。 */
