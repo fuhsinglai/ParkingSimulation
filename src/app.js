@@ -54,6 +54,7 @@ const cfg = {
 };
 const opts = {
   sweep: true, trace: true, clear: true, ghost: true, compare: true,
+  tab: 'sim',   // 'sim' 開車與規劃／'setup' 佈置場景
   step: 0.10,   // 每按一下前進／倒車走多遠（公尺）
   ...(saved?.opts || {}),
 };
@@ -149,6 +150,27 @@ function remakeView() {
   view = makeView(canvas, scene, 0.4, over('#hud', 'top'), over('#tip', 'bottom'));
 }
 new ResizeObserver(resize).observe(canvas);
+
+// ---------------------------------------------------------------- 模式分頁
+
+/**
+ * 環境設置與模擬分成兩頁，地圖兩邊共用。
+ *
+ * 顯示與否交給 CSS（body 上的 data-tab），這裡只負責記狀態與按鈕外觀。
+ * 換頁會改變版面高度，浮層讓位的距離要重算。
+ */
+function setTab(name) {
+  opts.tab = name === 'setup' ? 'setup' : 'sim';
+  document.body.dataset.tab = opts.tab;
+  $('#tabSim').classList.toggle('on', opts.tab === 'sim');
+  $('#tabSetup').classList.toggle('on', opts.tab === 'setup');
+  $('#tabSim').setAttribute('aria-selected', String(opts.tab === 'sim'));
+  $('#tabSetup').setAttribute('aria-selected', String(opts.tab === 'setup'));
+  resize();
+  saveSoon();
+}
+$('#tabSim').onclick = () => setTab('sim');
+$('#tabSetup').onclick = () => setTab('setup');
 
 // ---------------------------------------------------------------- 繪圖
 
@@ -945,6 +967,9 @@ function setSceneLocked(on) {
   // 「放到定位」是把車瞬移進車位，挑戰時等於一鍵過關，要一起鎖掉。
   // 「回到起點」留著 —— 它跟「重來」是同一件事。
   $('#toGoal').disabled = on;
+  // 環境設置那一頁整頁都是在改題目，挑戰中直接關掉，比進去看一堆灰掉的滑桿清楚。
+  $('#tabSetup').disabled = on;
+  if (on) setTab('sim');
 }
 
 function startChallenge(def) {
@@ -1292,6 +1317,7 @@ function syncSteerRange() {
 
 renderObstacles();
 syncControls();
+setTab(opts.tab);
 {
   const el = document.querySelector('#storeState');
   if (el) el.textContent = storeState;

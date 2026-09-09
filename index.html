@@ -19,6 +19,11 @@
     <div class="status" id="status"><span class="dot"></span><span id="statusText">準備</span></div>
   </header>
 
+  <nav class="tabs" role="tablist" aria-label="模式">
+    <button class="tab" id="tabSim" role="tab">模擬</button>
+    <button class="tab" id="tabSetup" role="tab">環境設置</button>
+  </nav>
+
   <section class="layout">
 
     <div class="panel">
@@ -56,7 +61,7 @@
         <div><i style="background:#e6ebee;border:1px dashed #5b6870"></i>大門（牆上開口）</div>
       </div>
 
-      <div class="drivebar">
+      <div class="drivebar" data-only="sim">
         <div class="db-row">
           <div class="db-group">
             <button class="btn db-s" id="steerWall">◀ 打向牆側</button>
@@ -85,7 +90,7 @@
         <p class="note db-hint" id="hint"><b>A</b>／<b>←</b> 往畫面左開，<b>D</b>／<b>→</b> 往畫面右開（車頭朝哪邊決定那是前進還是倒車），<b>Q</b> 方向盤回正，<b>空白鍵</b> 播放／暫停。<br><b>滑鼠滾輪</b>在圖上或這一列也能轉方向盤：往上打向外側，一格 2 度。</p>
       </div>
 
-      <div class="timeline" id="timeline" hidden>
+      <div class="timeline" id="timeline" data-only="sim" hidden>
         <div class="tl-row">
           <button class="btn play" id="playBtn">▶ 播放</button>
           <input id="scrub" type="range" min="0" max="100" value="0" step="1" aria-label="路徑進度">
@@ -98,7 +103,7 @@
 
     <aside class="side">
 
-      <div class="panel pad" id="panelChallenge">
+      <div class="panel pad" id="panelChallenge" data-only="sim">
         <h2>挑戰</h2>
         <p class="note">選一關，車會回到起點、計數歸零。目標是把車停進車位，<b>折返次數越少越好</b>，同分再比總行程。</p>
         <div class="ch-list" id="chList"></div>
@@ -118,7 +123,7 @@
         </div>
       </div>
 
-      <div class="panel pad">
+      <div class="panel pad" id="panelVerdict" data-only="sim">
         <h2>可行性分析</h2>
         <div class="verdict" id="verdict">尚未計算</div>
         <table class="facts">
@@ -134,7 +139,7 @@
         <p class="note" id="planNote">會實際搜尋不碰撞的路徑；車位越緊，算越久（最多約 10 秒）。</p>
       </div>
 
-      <div class="panel pad">
+      <div class="panel pad" id="panelDisplay" data-only="sim">
         <h2>顯示</h2>
         <label class="check"><input id="optSweep" type="checkbox" checked>車身掃掠面積</label>
         <label class="check"><input id="optTrace" type="checkbox" checked>行駛軌跡</label>
@@ -142,21 +147,19 @@
         <label class="check"><input id="optGhost" type="checkbox" checked>目標停車位置</label>
       </div>
 
-      <details class="panel pad" id="panelVehicle">
-        <summary>車輛規格</summary>
-        <div class="setting"><label for="vLength">車長</label><input id="vLength" type="range" min="3.2" max="5.6" value="4.60" step=".01"><output id="vLengthO">4.60m</output></div>
-        <div class="setting"><label for="vWidth">車寬</label><input id="vWidth" type="range" min="1.5" max="2.1" value="1.855" step=".005"><output id="vWidthO">1.86m</output></div>
-        <div class="setting"><label for="vWheelbase">軸距</label><input id="vWheelbase" type="range" min="2.2" max="3.2" value="2.69" step=".01"><output id="vWheelbaseO">2.69m</output></div>
-        <div class="setting"><label for="vTurn">最小迴轉半徑</label><input id="vTurn" type="range" min="4.4" max="7.2" value="5.70" step=".05"><output id="vTurnO">5.70m</output></div>
-        <table class="facts">
-          <tr><th>前輪最大轉角</th><td id="vSteer">—</td></tr>
-          <tr><th>後軸迴轉半徑</th><td id="vRear">—</td></tr>
-          <tr><th>前懸／後懸</th><td id="vOver">—</td></tr>
-        </table>
-        <p class="note"><b>最小迴轉半徑</b>填規格表上那個數字（量的是外前輪）。RAV4 PHEV 原廠 19 吋是 5.70m、一般版 17 吋 5.50m。<b>換非原廠輪圈沒有規格可查</b> —— 加寬的輪圈常因輪拱間隙限制轉向角，實際會再大一些。<br>要實測：空曠處方向盤打到底繞一整圈，量外側前輪畫出來那個圓的直徑，除以 2。</p>
+      <details class="panel pad" open id="panelObstacles" data-only="setup">
+        <summary>障礙物（位置與尺寸都可調）</summary>
+        <div id="obstacleList"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn grow" id="addHouse">＋ 住家側</button>
+          <button class="btn grow" id="addFar">＋ 對面側</button>
+          <button class="btn grow warn" id="resetObs">全部重設</button>
+        </div>
+        <p class="note">所有設定（含障礙物、大門、充電器）會自動存在這台裝置的瀏覽器裡。「全部重設」會把所有設定改回預設值。<br>狀態：<b id="storeState">—</b></p>
+        <p class="note">車輛尺寸採 RAV4 XA50：長 4.60m、寬 1.855m、軸距 2.69m。最大轉向角 34° 是由原廠迴轉直徑 11.0m 反推的，不是估的。</p>
       </details>
 
-      <details class="panel pad" open id="panelLane">
+      <details class="panel pad" open id="panelLane" data-only="setup">
         <summary>巷道與車位</summary>
         <div class="setting"><label for="alley">建物間總寬</label><input id="alley" type="range" min="3.6" max="8" value="5.9" step=".05"><output id="alleyO">5.90m</output></div>
         <div class="setting"><label for="houseFront">屋前空間長度</label><input id="houseFront" type="range" min="4" max="14" value="6.10" step=".05"><output id="houseFrontO">6.10m</output></div>
@@ -176,16 +179,18 @@
         <p class="note"><b>大門只是牆上的參照物</b>，不佔車位、不進碰撞檢查 —— 車照樣可以停在門前。它只用來檢查停好之後剩下的開口，人還走不走得出去。</p>
       </details>
 
-      <details class="panel pad" open id="panelObstacles">
-        <summary>障礙物（位置與尺寸都可調）</summary>
-        <div id="obstacleList"></div>
-        <div class="row" style="margin-top:12px">
-          <button class="btn grow" id="addHouse">＋ 住家側</button>
-          <button class="btn grow" id="addFar">＋ 對面側</button>
-          <button class="btn grow warn" id="resetObs">全部重設</button>
-        </div>
-        <p class="note">所有設定（含障礙物、大門、充電器）會自動存在這台裝置的瀏覽器裡。「全部重設」會把所有設定改回預設值。<br>狀態：<b id="storeState">—</b></p>
-        <p class="note">車輛尺寸採 RAV4 XA50：長 4.60m、寬 1.855m、軸距 2.69m。最大轉向角 34° 是由原廠迴轉直徑 11.0m 反推的，不是估的。</p>
+      <details class="panel pad" id="panelVehicle" data-only="setup">
+        <summary>車輛規格</summary>
+        <div class="setting"><label for="vLength">車長</label><input id="vLength" type="range" min="3.2" max="5.6" value="4.60" step=".01"><output id="vLengthO">4.60m</output></div>
+        <div class="setting"><label for="vWidth">車寬</label><input id="vWidth" type="range" min="1.5" max="2.1" value="1.855" step=".005"><output id="vWidthO">1.86m</output></div>
+        <div class="setting"><label for="vWheelbase">軸距</label><input id="vWheelbase" type="range" min="2.2" max="3.2" value="2.69" step=".01"><output id="vWheelbaseO">2.69m</output></div>
+        <div class="setting"><label for="vTurn">最小迴轉半徑</label><input id="vTurn" type="range" min="4.4" max="7.2" value="5.70" step=".05"><output id="vTurnO">5.70m</output></div>
+        <table class="facts">
+          <tr><th>前輪最大轉角</th><td id="vSteer">—</td></tr>
+          <tr><th>後軸迴轉半徑</th><td id="vRear">—</td></tr>
+          <tr><th>前懸／後懸</th><td id="vOver">—</td></tr>
+        </table>
+        <p class="note"><b>最小迴轉半徑</b>填規格表上那個數字（量的是外前輪）。RAV4 PHEV 原廠 19 吋是 5.70m、一般版 17 吋 5.50m。<b>換非原廠輪圈沒有規格可查</b> —— 加寬的輪圈常因輪拱間隙限制轉向角，實際會再大一些。<br>要實測：空曠處方向盤打到底繞一整圈，量外側前輪畫出來那個圓的直徑，除以 2。</p>
       </details>
 
     </aside>

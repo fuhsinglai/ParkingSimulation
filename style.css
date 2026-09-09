@@ -40,6 +40,24 @@ h1 { font-size: clamp(1.3rem, 3vw, 1.95rem); line-height: 1.1; margin: 0; }
 }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--amber); }
 
+/* ---- 模式分頁 ---- */
+/*
+ * 環境設置與模擬分開。原本兩件事擠在同一個側欄裡，調障礙物的滑桿在最下面，
+ * 眼睛得在畫面上下跑；分頁之後該用的面板就排在地圖旁邊。
+ * 地圖兩邊共用，換分頁只換周邊的面板。
+ */
+.tabs { display: flex; gap: 6px; margin: 0 0 12px; }
+.tab {
+  padding: 7px 16px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--card); color: var(--muted); cursor: pointer; font-weight: 600;
+}
+.tab:hover { border-color: #bfd6f5; color: var(--ink); }
+.tab.on { background: #e9f2ff; border-color: #bfd6f5; color: #1459a6; }
+.tab:disabled { opacity: .45; cursor: not-allowed; }
+
+body[data-tab="sim"] [data-only="setup"],
+body[data-tab="setup"] [data-only="sim"] { display: none !important; }
+
 .layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, .72fr); gap: 14px; align-items: start; }
 .side { display: grid; gap: 14px; }
 
