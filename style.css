@@ -59,7 +59,12 @@ body[data-tab="sim"] [data-only="setup"],
 body[data-tab="setup"] [data-only="sim"] { display: none !important; }
 
 .layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, .72fr); gap: 14px; align-items: start; }
-.side { display: grid; gap: 14px; }
+/*
+ * 側欄自己捲，不要拖著整頁一起捲 —— 調障礙物時地圖必須留在視線裡，
+ * 那正是你在調的東西。
+ */
+.side { display: grid; gap: 14px; position: sticky; top: 10px; align-self: start;
+  max-height: calc(100vh - 20px); overflow-y: auto; padding-right: 2px; }
 
 .panel {
   background: var(--card); border: 1px solid var(--line);
@@ -172,19 +177,29 @@ summary { cursor: pointer; font-weight: 750; margin: -2px 0 8px; }
 /* ---- 障礙物編輯器 ---- */
 .obs {
   border: 1px solid var(--line); border-radius: 12px;
-  padding: 10px 11px; margin-bottom: 9px; background: #fafcfc;
+  margin-bottom: 7px; background: #fafcfc;
 }
 .obs.off { opacity: .5; }
-.obs-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.obs-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; cursor: pointer; list-style: none;
+}
+.obs-head::-webkit-details-marker { display: none; }
+.obs-head:hover { background: #f1f6f7; border-radius: 12px; }
+.obs[open] > .obs-head { border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0; }
+.obs-name { font-size: .82rem; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.obs-vals { margin-left: auto; font-size: .74rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.obs-body { padding: 8px 11px 10px; }
+.obs-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
 .obs-head input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--blue); flex: none; }
-.obs-head input[type=text] {
+.obs-meta input[type=text] {
   flex: 1; min-width: 0; border: 1px solid transparent; background: transparent;
   font-weight: 750; font-size: .88rem; padding: 3px 5px; border-radius: 7px; color: var(--ink);
 }
-.obs-head input[type=text]:focus { border-color: var(--line); background: #fff; outline: none; }
-.obs-head select { border: 1px solid var(--line); border-radius: 7px; padding: 3px 5px; font-size: .76rem; background: #fff; }
-.obs-head .del { border: none; background: none; cursor: pointer; color: var(--muted); font-size: 1rem; padding: 2px 5px; }
-.obs-head .del:hover { color: var(--red); }
+.obs-meta input[type=text]:focus { border-color: var(--line); background: #fff; outline: none; }
+.obs-meta select { border: 1px solid var(--line); border-radius: 7px; padding: 3px 5px; font-size: .76rem; background: #fff; }
+.obs-meta .del { border: none; background: none; cursor: pointer; color: var(--muted); font-size: 1rem; padding: 2px 5px; }
+.obs-meta .del:hover { color: var(--red); }
 .obs .setting { grid-template-columns: 52px 1fr 52px; margin: 6px 0; }
 .obs .setting label { font-size: .78rem; color: var(--muted); }
 .obs .setting output { font-size: .78rem; }
@@ -219,6 +234,11 @@ summary { cursor: pointer; font-weight: 750; margin: -2px 0 8px; }
   /* 窄螢幕連提示條都不浮在圖上。留著絕對定位的話它會落在畫布外面疊到別的東西。 */
   .tip { position: static; border-radius: 0; }
   .canvas-wrap canvas { aspect-ratio: 1.25; }
+}
+
+/* 單欄的時候側欄排在地圖下面，黏著與內捲都沒有意義，反而把內容關進小框裡。 */
+@media (max-width: 860px) {
+  .side { position: static; max-height: none; overflow: visible; }
 }
 
 .hud-derived {

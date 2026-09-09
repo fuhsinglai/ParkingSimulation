@@ -681,13 +681,19 @@ function fieldsFor(o) {
 
 const rowRefs = new Map();   // obstacle.id -> { x, length, depth } 的 {range, output}
 
+/**
+ * 一個障礙物一列。預設收合成一行，展開才出滑桿。
+ *
+ * 七個障礙物各佔三根滑桿的話，側欄會長到一千多像素，調一個要捲半天，
+ * 而且捲下去就看不到地圖了 —— 而地圖正是你在調的東西。
+ */
 function obstacleRow(o) {
-  const row = document.createElement('div');
+  const row = document.createElement('details');
   row.className = 'obs' + (o.on ? '' : ' off');
   const refs = {};
   rowRefs.set(o.id, refs);
 
-  const head = document.createElement('div');
+  const head = document.createElement('summary');
   head.className = 'obs-head';
 
   const on = document.createElement('input');
@@ -695,6 +701,8 @@ function obstacleRow(o) {
   on.checked = o.on;
   on.title = '是否存在';
   on.onchange = () => { o.on = on.checked; row.classList.toggle('off', !o.on); rebuild(); };
+  // summary 只要被點到就會展開／收合，勾選框得自己把事件擋下來。
+  on.onclick = (e) => e.stopPropagation();
 
   const sw = document.createElement('span');
   sw.className = 'swatch';
@@ -703,7 +711,7 @@ function obstacleRow(o) {
   const name = document.createElement('input');
   name.type = 'text';
   name.value = o.label;
-  name.oninput = () => { o.label = name.value || '障礙'; rebuild(); };
+  name.oninput = () => { o.label = name.value || '障礙'; refs.__summary(); rebuild(); };
 
   const kind = document.createElement('select');
   for (const [v, t] of KINDS) kind.add(new Option(t, v));
@@ -730,10 +738,31 @@ function obstacleRow(o) {
     rebuild();
   };
 
-  head.append(on, sw, name, kind, side, del);
+  // 收合時看得到名稱與現在的數值，不必展開才知道自己在找哪一個。
+  const title = document.createElement('b');
+  title.className = 'obs-name';
+  const vals = document.createElement('span');
+  title.textContent = o.label;
+  head.append(on, sw, title, vals);
   row.appendChild(head);
 
-  for (const f of fieldsFor(o)) {
+  const body = document.createElement('div');
+  body.className = 'obs-body';
+  const meta = document.createElement('div');
+  meta.className = 'obs-meta';
+  meta.append(name, kind, side, del);
+  body.appendChild(meta);
+  row.appendChild(body);
+
+  const fields = fieldsFor(o);
+  refs.__summary = () => {
+    title.textContent = o.label;
+    vals.className = 'obs-vals';
+    vals.textContent = fields.map(f => f.fmt(f.get())).join(' · ');
+  };
+  refs.__summary();
+
+  for (const f of fields) {
     const wrap = document.createElement('div');
     wrap.className = 'setting';
     const lab = document.createElement('label');
@@ -746,11 +775,12 @@ function obstacleRow(o) {
     range.oninput = () => {
       f.set(+range.value);
       out.textContent = f.fmt(f.get());
+      refs.__summary();
       rebuild();
     };
     refs[f.key] = { range, out, f };
     wrap.append(lab, range, out);
-    row.appendChild(wrap);
+    body.appendChild(wrap);
   }
   return row;
 }
@@ -759,10 +789,12 @@ function obstacleRow(o) {
 function syncRow(o) {
   const refs = rowRefs.get(o.id);
   if (!refs) return;
-  for (const r of Object.values(refs)) {
+  for (const [key, r] of Object.entries(refs)) {
+    if (key === '__summary') continue;
     r.range.value = r.f.get();
     r.out.textContent = r.f.fmt(r.f.get());
   }
+  refs.__summary();
 }
 
 function renderObstacles() {
