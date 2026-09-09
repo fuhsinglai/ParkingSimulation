@@ -198,6 +198,24 @@ function updateStatus() {
   $('#mHeading').textContent = (p.theta * 180 / Math.PI).toFixed(1) + '°';
   $('#mClear').textContent = near ? near.distance.toFixed(2) + 'm' : '—';
   $('#mMoves').textContent = moves;
+  $('#mShifts').textContent = plan ? plan.reversals : manualReversals();
+}
+
+/**
+ * 自己開的時候折了幾次：相鄰兩步的行進方向相反就算一次，跟規劃器報的「折N」同一個算法。
+ *
+ * 從 manualPoses 現算而不另外計數 —— 那個陣列在「上一步」時會一起被 pop，
+ * 少維護一個會跟 undo 走散的計數器。連按同方向不算折返，換方向那一下才算。
+ */
+function manualReversals() {
+  let n = 0;
+  let prev = 0;
+  for (const p of manualPoses) {
+    if (!p.dir) continue;
+    if (prev && p.dir !== prev) n++;
+    prev = p.dir;
+  }
+  return n;
 }
 
 function setTip(msg) { $('#tip').textContent = msg; }
