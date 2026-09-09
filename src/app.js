@@ -122,8 +122,31 @@ function resize() {
   if (!r.width) return;
   canvas.width = Math.round(r.width * dpr);
   canvas.height = Math.round(r.height * dpr);
-  view = makeView(canvas, scene);
+  remakeView();
   invalidate();
+}
+
+/**
+ * 參數列與提示條浮在畫布上，場景要讓出它們的高度，路面才不會被蓋住。
+ *
+ * 高度用量的而不是寫死的：視窗一窄，那兩塊就會換行變高。11px 是 CSS 裡浮層
+ * 距離畫布邊緣的距離，上下各留一份當間距。
+ */
+function remakeView() {
+  if (!canvas.width) return;
+  const box = canvas.getBoundingClientRect();
+  if (!box.height) return;
+  const dpr = canvas.height / box.height;
+  const gap = 11;
+  // 量的是「實際蓋住畫布多少」，不是元素自己多高。窄螢幕時參數列會排到畫布外面
+  // 變成普通元素，那時候一格都不必讓 —— 拿高度硬減會把場景壓成一條線。
+  const over = (sel, edge) => {
+    const b = $(sel).getBoundingClientRect();
+    if (!b.height || b.top >= box.bottom || b.bottom <= box.top) return 0;
+    const d = edge === 'top' ? b.bottom - box.top : box.bottom - b.top;
+    return Math.max(0, d + gap) * dpr;
+  };
+  view = makeView(canvas, scene, 0.4, over('#hud', 'top'), over('#tip', 'bottom'));
 }
 new ResizeObserver(resize).observe(canvas);
 
@@ -239,7 +262,12 @@ function manualReversals() {
   return n;
 }
 
-function setTip(msg) { $('#tip').textContent = msg; }
+function setTip(msg) {
+  const before = $('#tip').getBoundingClientRect().height;
+  $('#tip').textContent = msg;
+  // 提示變長變短會讓它換行，浮層一變高場景就得重新讓位。
+  if ($('#tip').getBoundingClientRect().height !== before) remakeView();
+}
 
 /**
  * 從巷子哪一頭進來，決定了行進方向 —— 而且兩者是相反的：
@@ -514,7 +542,7 @@ function rebuild() {
   scene = buildScene(cfg);
   syncSteerRange();
   narrow = narrowestPoint(scene);
-  view = makeView(canvas, scene);
+  remakeView();
   clearPlan();
   pose = { ...scene.start };
   manualPoses = [{ ...pose, dir: 0 }];

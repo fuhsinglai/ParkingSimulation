@@ -52,14 +52,13 @@ h1 { font-size: clamp(1.3rem, 3vw, 1.95rem); line-height: 1.1; margin: 0; }
 .panel h2 { font-size: 1.02rem; margin: 0 0 11px; }
 
 .canvas-wrap { position: relative; background: #cbd1d3; }
-.canvas-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 1000/560; touch-action: none; }
+.canvas-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 1000/640; touch-action: none; }
 
+/* 圖例排在畫布下面，不浮在上面 —— 八列的直式圖例會蓋掉左半邊的路面。 */
 .legend {
-  position: absolute; left: 11px; top: 11px;
-  background: rgba(255, 255, 255, .93); backdrop-filter: blur(8px);
-  padding: 8px 10px; border-radius: 10px;
-  font-size: .74rem; line-height: 1.7;
-  box-shadow: 0 3px 14px rgba(0, 0, 0, .12);
+  display: flex; flex-wrap: wrap; gap: 2px 16px;
+  padding: 9px 14px; border-top: 1px solid var(--line);
+  font-size: .74rem; line-height: 1.7; color: var(--muted);
 }
 .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 
@@ -147,7 +146,6 @@ summary { cursor: pointer; font-weight: 750; margin: -2px 0 8px; }
   .app { padding: 10px 10px 28px; }
   header { align-items: flex-start; }
   .layout { grid-template-columns: 1fr; }
-  .canvas-wrap canvas { aspect-ratio: 1.25; }
   .status { font-size: .8rem; }
   .legend { font-size: .68rem; }
   .setting { grid-template-columns: 100px 1fr 50px; }
@@ -202,7 +200,12 @@ summary { cursor: pointer; font-weight: 750; margin: -2px 0 8px; }
 .hud-n.bad b { color: var(--red); }
 
 @media (max-width: 1000px) {
+  /* 窄螢幕放不下浮在圖上的參數列與提示條，改排到圖的下面。
+     留著絕對定位的話，它們會落在畫布外、互相疊在一起。 */
   .hud { position: static; margin: 0; border-radius: 0; box-shadow: none; background: #fff; border-bottom: 1px solid var(--line); }
+  .tip { position: static; border-radius: 0; }
+  /* 沒有東西浮在圖上了，畫布就不必為了讓位而留那麼高。 */
+  .canvas-wrap canvas { aspect-ratio: 1.45; }
 }
 
 .hud-derived {

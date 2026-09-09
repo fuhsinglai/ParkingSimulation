@@ -11,15 +11,22 @@ import { bodyPolygon, chargePort } from './vehicle.js';
 import { SCOOTER_PITCH } from './config.js';
 
 /** 計算把整個場景塞進畫布的縮放與位移。 */
-export function makeView(canvas, scene, pad = 0.4) {
+/**
+ * 場景到畫布的轉換。
+ *
+ * insetTop／insetBottom 是畫布上下要讓出來的畫素 —— 參數列與提示條浮在畫布上，
+ * 場景畫進剩下的那一段才不會被蓋住。單位是畫布畫素（已含 devicePixelRatio）。
+ */
+export function makeView(canvas, scene, pad = 0.4, insetTop = 0, insetBottom = 0) {
   const shoulder = 1.05;
   const worldW = scene.xMax - scene.xMin;
   const worldH = scene.cfg.alleyWidth + shoulder * 2;
-  const s = Math.min(canvas.width / (worldW + pad * 2), canvas.height / (worldH + pad * 2));
+  const availH = Math.max(1, canvas.height - insetTop - insetBottom);
+  const s = Math.min(canvas.width / (worldW + pad * 2), availH / (worldH + pad * 2));
   return {
     scale: s,
     offsetX: (canvas.width - worldW * s) / 2 - scene.xMin * s,
-    offsetY: (canvas.height - worldH * s) / 2 + shoulder * s,
+    offsetY: insetTop + (availH - worldH * s) / 2 + shoulder * s,
     apply(ctx) { ctx.setTransform(s, 0, 0, s, this.offsetX, this.offsetY); },
     toWorld(px, py) { return [(px - this.offsetX) / s, (py - this.offsetY) / s]; },
   };

@@ -24,16 +24,6 @@
     <div class="panel">
       <div class="canvas-wrap">
         <canvas id="scene" aria-label="俯視窄巷平行停車場景"></canvas>
-        <div class="legend">
-          <div><i style="background:#fff;border:1px solid #333"></i>你的 RAV4</div>
-          <div><i style="background:#aeb7c0"></i>對面白車</div>
-          <div><i style="background:#df8737"></i>機車／固定障礙</div>
-          <div><i style="background:#4b9cff"></i>前進軌跡</div>
-          <div><i style="background:#ffb648"></i>倒車軌跡</div>
-          <div><i style="background:rgba(90,160,255,.35)"></i>車身掃掠面積</div>
-          <div><i style="background:#17a673;border:1.5px solid #fff;box-shadow:0 0 0 1px #0b5f45"></i>充電器</div>
-          <div><i style="background:#e6ebee;border:1px dashed #5b6870"></i>大門（牆上開口）</div>
-        </div>
         <div class="hud" id="hud">
           <label class="hud-f"><span>從哪頭開進來</span><select id="approach">
             <option value="left">巷子左邊</option>
@@ -54,6 +44,16 @@
           <div class="hud-n"><b id="hCharge">—</b><span>充電線長度</span></div>
         </div>
         <div class="tip" id="tip">直接在圖上<b>拖曳</b>障礙物就能調位置：拖中間搬動、拖左右端改長度、拖面向巷道那一邊改突出深度。牆上的<b>大門</b>與<b>充電器</b>也能拖（拖大門兩端可改寬度）。</div>
+      </div>
+      <div class="legend">
+        <div><i style="background:#fff;border:1px solid #333"></i>你的 RAV4</div>
+        <div><i style="background:#aeb7c0"></i>對面白車</div>
+        <div><i style="background:#df8737"></i>機車／固定障礙</div>
+        <div><i style="background:#4b9cff"></i>前進軌跡</div>
+        <div><i style="background:#ffb648"></i>倒車軌跡</div>
+        <div><i style="background:rgba(90,160,255,.35)"></i>車身掃掠面積</div>
+        <div><i style="background:#17a673;border:1.5px solid #fff;box-shadow:0 0 0 1px #0b5f45"></i>充電器</div>
+        <div><i style="background:#e6ebee;border:1px dashed #5b6870"></i>大門（牆上開口）</div>
       </div>
 
       <div class="drivebar">
